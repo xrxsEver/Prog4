@@ -93,12 +93,12 @@ void dae::Minigin::Run(const std::function<void()> &load)
 {
 	load();
 
+#ifndef __EMSCRIPTEN__
 	auto lastTime = std::chrono::high_resolution_clock::now();
 	float lag = 0.0f;
 	constexpr float fixedTimeStep = GameTime::GetFixedTimeStep();
 	constexpr auto desiredFrameTime = std::chrono::milliseconds(16); // ~60 FPS cap
 
-#ifndef __EMSCRIPTEN__
 	while (!m_quit)
 	{
 		auto currentTime = std::chrono::high_resolution_clock::now();
