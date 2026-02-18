@@ -1,24 +1,27 @@
 ﻿#include <stdexcept>
 #include <sstream>
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 #if WIN32
-#define WIN32_LEAN_AND_MEAN 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
 
 #include <SDL3/SDL.h>
-//#include <SDL3_image/SDL_image.h>
+// #include <SDL3_image/SDL_image.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include "Minigin.h"
 #include "InputManager.h"
 #include "SceneManager.h"
 #include "Renderer.h"
 #include "ResourceManager.h"
+#include "GameTime.h"
 
-SDL_Window* g_window{};
+SDL_Window *g_window{};
 
-void LogSDLVersion(const std::string& message, int major, int minor, int patch)
+void LogSDLVersion(const std::string &message, int major, int minor, int patch)
 {
 #if WIN32
 	std::stringstream ss;
@@ -32,9 +35,9 @@ void LogSDLVersion(const std::string& message, int major, int minor, int patch)
 #ifdef __EMSCRIPTEN__
 #include "emscripten.h"
 
-void LoopCallback(void* arg)
+void LoopCallback(void *arg)
 {
-	static_cast<dae::Minigin*>(arg)->RunOneFrame();
+	static_cast<dae::Minigin *>(arg)->RunOneFrame();
 }
 #endif
 
@@ -49,15 +52,15 @@ void PrintSDLVersion()
 	// LogSDLVersion("Compiled with SDL_image ",SDL_IMAGE_MAJOR_VERSION, SDL_IMAGE_MINOR_VERSION, SDL_IMAGE_MICRO_VERSION);
 	// version = IMG_Version();
 	// LogSDLVersion("Linked with SDL_image ", SDL_VERSIONNUM_MAJOR(version), SDL_VERSIONNUM_MINOR(version), SDL_VERSIONNUM_MICRO(version));
-	LogSDLVersion("Compiled with SDL_ttf ",	SDL_TTF_MAJOR_VERSION, SDL_TTF_MINOR_VERSION,SDL_TTF_MICRO_VERSION);
+	LogSDLVersion("Compiled with SDL_ttf ", SDL_TTF_MAJOR_VERSION, SDL_TTF_MINOR_VERSION, SDL_TTF_MICRO_VERSION);
 	version = TTF_Version();
-	LogSDLVersion("Linked with SDL_ttf ", SDL_VERSIONNUM_MAJOR(version), SDL_VERSIONNUM_MINOR(version),	SDL_VERSIONNUM_MICRO(version));
+	LogSDLVersion("Linked with SDL_ttf ", SDL_VERSIONNUM_MAJOR(version), SDL_VERSIONNUM_MINOR(version), SDL_VERSIONNUM_MICRO(version));
 }
 
-dae::Minigin::Minigin(const std::filesystem::path& dataPath)
+dae::Minigin::Minigin(const std::filesystem::path &dataPath)
 {
 	PrintSDLVersion();
-	
+
 	if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
 	{
 		SDL_Log("Renderer error: %s", SDL_GetError());
@@ -68,9 +71,8 @@ dae::Minigin::Minigin(const std::filesystem::path& dataPath)
 		"Programming 4 assignment",
 		1024,
 		576,
-		SDL_WINDOW_OPENGL
-	);
-	if (g_window == nullptr) 
+		SDL_WINDOW_OPENGL);
+	if (g_window == nullptr)
 	{
 		throw std::runtime_error(std::string("SDL_CreateWindow Error: ") + SDL_GetError());
 	}
@@ -87,12 +89,45 @@ dae::Minigin::~Minigin()
 	SDL_Quit();
 }
 
-void dae::Minigin::Run(const std::function<void()>& load)
+void dae::Minigin::Run(const std::function<void()> &load)
 {
 	load();
+
+	auto lastTime = std::chrono::high_resolution_clock::now();
+	float lag = 0.0f;
+	constexpr float fixedTimeStep = GameTime::GetFixedTimeStep();
+	constexpr auto desiredFrameTime = std::chrono::milliseconds(16); // ~60 FPS cap
+
 #ifndef __EMSCRIPTEN__
 	while (!m_quit)
-		RunOneFrame();
+	{
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
+		lastTime = currentTime;
+
+		lag += deltaTime;
+
+		GameTime::GetInstance().SetDeltaTime(deltaTime);
+
+		m_quit = !InputManager::GetInstance().ProcessInput();
+
+		// fixed update loop - runs at a fixed rate
+		while (lag >= fixedTimeStep)
+		{
+			SceneManager::GetInstance().FixedUpdate();
+			lag -= fixedTimeStep;
+		}
+
+		// normal update - runs every frame
+		SceneManager::GetInstance().Update();
+		Renderer::GetInstance().Render();
+
+		// cap frame rate so it's the same on all devices
+		auto frameEnd = std::chrono::high_resolution_clock::now();
+		auto sleepTime = desiredFrameTime - (frameEnd - lastTime);
+		if (sleepTime > std::chrono::milliseconds(0))
+			std::this_thread::sleep_for(sleepTime);
+	}
 #else
 	emscripten_set_main_loop_arg(&LoopCallback, this, 0, true);
 #endif
@@ -100,6 +135,14 @@ void dae::Minigin::Run(const std::function<void()>& load)
 
 void dae::Minigin::RunOneFrame()
 {
+	// used by emscripten
+	static auto lastTime = std::chrono::high_resolution_clock::now();
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
+	lastTime = currentTime;
+
+	GameTime::GetInstance().SetDeltaTime(deltaTime);
+
 	m_quit = !InputManager::GetInstance().ProcessInput();
 	SceneManager::GetInstance().Update();
 	Renderer::GetInstance().Render();
