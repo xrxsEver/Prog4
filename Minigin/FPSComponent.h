@@ -13,6 +13,7 @@ namespace dae
         void Update() override;
 
     private:
+        TextComponent *m_pTextComponent{};
         int m_frameCount{};
         float m_elapsedTime{};
     };

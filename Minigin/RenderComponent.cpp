@@ -11,11 +11,7 @@ dae::RenderComponent::RenderComponent(GameObject *pOwner)
 
 void dae::RenderComponent::Render() const
 {
-    if (!m_texture)
-        return;
-
-    const auto &pos = GetOwner()->GetTransform().GetPosition();
-    Renderer::GetInstance().RenderTexture(*m_texture, pos.x, pos.y);
+    RenderTextureAtOwnerPosition(m_texture);
 }
 
 void dae::RenderComponent::SetTexture(const std::string &filename)

@@ -33,11 +33,7 @@ void dae::TextComponent::Update()
 
 void dae::TextComponent::Render() const
 {
-    if (m_textTexture)
-    {
-        const auto &pos = GetOwner()->GetTransform().GetPosition();
-        Renderer::GetInstance().RenderTexture(*m_textTexture, pos.x, pos.y);
-    }
+    RenderTextureAtOwnerPosition(m_textTexture);
 }
 
 void dae::TextComponent::SetText(const std::string &text)

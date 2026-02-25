@@ -15,6 +15,9 @@ namespace dae
 		void FixedUpdate();
 		void Render() const;
 
+		void MarkForDelete();
+		bool IsMarkedForDelete() const;
+
 		void SetPosition(float x, float y);
 		Transform &GetTransform() { return m_transform; }
 		const Transform &GetTransform() const { return m_transform; }
@@ -67,5 +70,6 @@ namespace dae
 	private:
 		Transform m_transform{};
 		std::vector<std::unique_ptr<Component>> m_components{};
+		bool m_isMarkedForDelete{};
 	};
 }

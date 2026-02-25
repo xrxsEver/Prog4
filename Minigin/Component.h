@@ -1,8 +1,10 @@
 #pragma once
+#include <memory>
 
 namespace dae
 {
     class GameObject;
+    class Texture2D;
 
     class Component
     {
@@ -22,6 +24,7 @@ namespace dae
 
     protected:
         explicit Component(GameObject *pOwner) : m_pOwner(pOwner) {}
+        void RenderTextureAtOwnerPosition(const std::shared_ptr<Texture2D> &texture) const;
 
     private:
         GameObject *m_pOwner;

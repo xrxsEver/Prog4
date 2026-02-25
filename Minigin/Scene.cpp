@@ -31,6 +31,14 @@ void Scene::Update()
 	{
 		object->Update();
 	}
+
+	m_objects.erase(
+		std::remove_if(
+			m_objects.begin(),
+			m_objects.end(),
+			[](const auto &object)
+			{ return object->IsMarkedForDelete(); }),
+		m_objects.end());
 }
 
 void Scene::FixedUpdate()

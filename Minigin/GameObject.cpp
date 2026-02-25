@@ -31,3 +31,13 @@ void dae::GameObject::SetPosition(float x, float y)
 {
 	m_transform.SetPosition(x, y, 0.0f);
 }
+
+void dae::GameObject::MarkForDelete()
+{
+	m_isMarkedForDelete = true;
+}
+
+bool dae::GameObject::IsMarkedForDelete() const
+{
+	return m_isMarkedForDelete;
+}
