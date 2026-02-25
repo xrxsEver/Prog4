@@ -5,7 +5,7 @@
 #include "SceneManager.h"
 #include "Texture2D.h"
 
-void dae::Renderer::Init(SDL_Window* window)
+void dae::Renderer::Init(SDL_Window *window)
 {
 	m_window = window;
 
@@ -26,7 +26,7 @@ void dae::Renderer::Init(SDL_Window* window)
 
 void dae::Renderer::Render() const
 {
-	const auto& color = GetBackgroundColor();
+	const auto &color = GetBackgroundColor();
 	SDL_SetRenderDrawColor(m_renderer, color.r, color.g, color.b, color.a);
 	SDL_RenderClear(m_renderer);
 
@@ -44,7 +44,7 @@ void dae::Renderer::Destroy()
 	}
 }
 
-void dae::Renderer::RenderTexture(const Texture2D& texture, const float x, const float y) const
+void dae::Renderer::RenderTexture(const Texture2D &texture, const float x, const float y) const
 {
 	SDL_FRect dst{};
 	dst.x = x;
@@ -53,7 +53,7 @@ void dae::Renderer::RenderTexture(const Texture2D& texture, const float x, const
 	SDL_RenderTexture(GetSDLRenderer(), texture.GetSDLTexture(), nullptr, &dst);
 }
 
-void dae::Renderer::RenderTexture(const Texture2D& texture, const float x, const float y, const float width, const float height) const
+void dae::Renderer::RenderTexture(const Texture2D &texture, const float x, const float y, const float width, const float height) const
 {
 	SDL_FRect dst{};
 	dst.x = x;
@@ -63,4 +63,14 @@ void dae::Renderer::RenderTexture(const Texture2D& texture, const float x, const
 	SDL_RenderTexture(GetSDLRenderer(), texture.GetSDLTexture(), nullptr, &dst);
 }
 
-SDL_Renderer* dae::Renderer::GetSDLRenderer() const { return m_renderer; }
+void dae::Renderer::RenderTexture(const Texture2D &texture, const SDL_FRect &srcRect, const float x, const float y, const float width, const float height) const
+{
+	SDL_FRect dst{};
+	dst.x = x;
+	dst.y = y;
+	dst.w = width;
+	dst.h = height;
+	SDL_RenderTexture(GetSDLRenderer(), texture.GetSDLTexture(), &srcRect, &dst);
+}
+
+SDL_Renderer *dae::Renderer::GetSDLRenderer() const { return m_renderer; }

@@ -2,6 +2,7 @@
 #include <vector>
 #include <memory>
 #include <algorithm>
+#include <glm/vec3.hpp>
 #include "Transform.h"
 
 namespace dae
@@ -18,9 +19,16 @@ namespace dae
 		void MarkForDelete();
 		bool IsMarkedForDelete() const;
 
+		void SetParent(GameObject *parent, bool keepWorldPosition = true);
+		GameObject *GetParent() const { return m_pParent; }
+		const std::vector<GameObject *> &GetChildren() const { return m_children; }
+
 		void SetPosition(float x, float y);
-		Transform &GetTransform() { return m_transform; }
-		const Transform &GetTransform() const { return m_transform; }
+		void SetLocalPosition(const glm::vec3 &pos);
+		const glm::vec3 &GetLocalPosition() const { return m_localPosition; }
+		const glm::vec3 &GetWorldPosition();
+		Transform &GetTransform();
+		const Transform &GetTransform() const;
 
 		// component system
 		template <typename T, typename... Args>
@@ -68,7 +76,17 @@ namespace dae
 		GameObject &operator=(GameObject &&other) = delete;
 
 	private:
-		Transform m_transform{};
+		void AddChild(GameObject *child);
+		void RemoveChild(GameObject *child);
+		void SetPositionDirty();
+		void UpdateWorldPosition() const;
+		bool IsChild(const GameObject *object) const;
+
+		mutable Transform m_transform{};
+		glm::vec3 m_localPosition{};
+		mutable bool m_isPositionDirty{true};
+		GameObject *m_pParent{};
+		std::vector<GameObject *> m_children{};
 		std::vector<std::unique_ptr<Component>> m_components{};
 		bool m_isMarkedForDelete{};
 	};

@@ -12,6 +12,7 @@
 #include "RenderComponent.h"
 #include "TextComponent.h"
 #include "FPSComponent.h"
+#include "RotationComponent.h"
 #include "Scene.h"
 
 #include <filesystem>
@@ -46,6 +47,38 @@ static void load()
 	go->AddComponent<dae::FPSComponent>();
 	go->SetPosition(20, 20);
 	scene.Add(std::move(go));
+
+	// Sprite is 15x15, top-left of first row in the sprite sheet
+	constexpr float spriteSize = 15.f;
+	constexpr float displaySize = 25.f; // scale
+
+	auto pivot = std::make_unique<dae::GameObject>();
+	pivot->SetPosition(320, 240); // screen center
+
+	auto character1 = std::make_unique<dae::GameObject>();
+	auto *pengo = character1->AddComponent<dae::RenderComponent>();
+	pengo->SetTexture("pengo.png");
+	pengo->SetSourceRect(0.f, 0.f, spriteSize, spriteSize);
+	pengo->SetRenderSize(displaySize, displaySize);
+	character1->AddComponent<dae::RotationComponent>(30.f, -5.f); //CW
+
+	auto *rawChar1 = character1.get();
+	character1->SetParent(pivot.get(), false);
+
+	// 11 rows down -> y = 10 * 15 = 165
+	auto character2 = std::make_unique<dae::GameObject>();
+	auto *sno = character2->AddComponent<dae::RenderComponent>();
+	sno->SetTexture("pengo.png");
+	sno->SetSourceRect(0.f, 10.f * spriteSize - 6, spriteSize, spriteSize);
+	sno->SetRenderSize(displaySize, displaySize);
+	character2->AddComponent<dae::RotationComponent>(40.f, 7.f); //CCW
+
+	character2->SetParent(rawChar1, false);
+
+	// here order matters: parent first
+	scene.Add(std::move(pivot));
+	scene.Add(std::move(character1));
+	scene.Add(std::move(character2));
 }
 
 int main(int, char*[]) {
