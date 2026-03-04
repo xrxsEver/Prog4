@@ -19,6 +19,8 @@ dae::GameObject::~GameObject()
 	}
 	m_children.clear();
 }
+// this can be changed to a simpler destrucor ,!gameobject()= defaulte
+
 
 void dae::GameObject::Update()
 {

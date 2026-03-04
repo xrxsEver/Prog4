@@ -16,6 +16,8 @@ namespace dae
 
 	public:
 		void Init(SDL_Window *window);
+
+		void ShutDown();
 		void Render() const;
 		void Destroy();
 

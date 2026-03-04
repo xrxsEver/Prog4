@@ -15,6 +15,7 @@ endif()
 
 # list source files here
 add_executable(${TARGET_NAME} ${TARGET_PARAM}
+  Minigin/CacheBenchmarkWindow.cpp
   Minigin/Component.cpp
   Minigin/Font.cpp
   Minigin/GameObject.cpp
@@ -108,6 +109,30 @@ if(NOT SDL3_ttf_FOUND)
   endif()
 endif()
 
+# Dear ImGui
+FetchContent_Declare(
+        imgui
+        GIT_REPOSITORY https://github.com/ocornut/imgui
+        GIT_TAG v1.92.5-docking
+        GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(imgui)
+
+add_library(imgui STATIC
+        ${imgui_SOURCE_DIR}/imgui.cpp
+        ${imgui_SOURCE_DIR}/imgui_draw.cpp
+        ${imgui_SOURCE_DIR}/imgui_tables.cpp
+        ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+        ${imgui_SOURCE_DIR}/imgui_demo.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp
+)
+
+target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${sdl3_SOURCE_DIR}/include)
+target_link_libraries(imgui PUBLIC SDL3::SDL3)
+# enable c++20 features
+target_compile_features(imgui PUBLIC cxx_std_20)
+
 if (WIN32)
   # Add VLD (Visual Leak Detector) for memory leak detection on Windows
   find_package(VLD CONFIG)
@@ -127,6 +152,23 @@ target_link_libraries("${TARGET_NAME}" PUBLIC
   SDL3_ttf::SDL3_ttf
   glm::glm
   ${VLD_LIBRARIES}
+)
+
+target_include_directories("${TARGET_NAME}" PUBLIC
+        ${CMAKE_SOURCE_DIR}/Minigin/
+        ${glm_SOURCE_DIR}
+        ${sdl3_SOURCE_DIR}/include
+        ${sdl3_image_SOURCE_DIR}/include
+        ${sdl3_ttf_SOURCE_DIR}/include
+        ${imgui_SOURCE_DIR}
+        ${VLD_INCLUDE_DIR}
+)
+
+target_link_libraries("${TARGET_NAME}" PUBLIC
+        SDL3::SDL3
+        SDL3_ttf::SDL3_ttf
+        imgui
+        ${VLD_LIBRARIES}
 )
 
 if(MSVC)
