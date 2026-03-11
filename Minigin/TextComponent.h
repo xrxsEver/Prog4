@@ -16,6 +16,8 @@ namespace dae
 
         void Update() override;
         void Render() const override;
+        const char *GetDebugName() const override { return "Text"; }
+        void DrawInspector() const override;
 
         void SetText(const std::string &text);
         void SetColor(const SDL_Color &color);

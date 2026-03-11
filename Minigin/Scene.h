@@ -12,6 +12,7 @@ namespace dae
 		void Add(std::unique_ptr<GameObject> object);
 		void Remove(const GameObject &object);
 		void RemoveAll();
+		const std::vector<std::unique_ptr<GameObject>> &GetObjects() const { return m_objects; }
 
 		void Update();
 		void FixedUpdate();

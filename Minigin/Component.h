@@ -12,6 +12,8 @@ namespace dae
         virtual void Update() {}
         virtual void FixedUpdate() {}
         virtual void Render() const {}
+        virtual const char *GetDebugName() const { return "Component"; }
+        virtual void DrawInspector() const {}
 
         virtual ~Component() = default;
 

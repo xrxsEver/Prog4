@@ -11,6 +11,8 @@ namespace dae
         explicit FPSComponent(GameObject *pOwner);
 
         void Update() override;
+        const char *GetDebugName() const override { return "FPS"; }
+        void DrawInspector() const override;
 
     private:
         TextComponent *m_pTextComponent{};

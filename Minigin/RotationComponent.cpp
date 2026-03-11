@@ -1,6 +1,7 @@
 #include "RotationComponent.h"
 #include "GameObject.h"
 #include "GameTime.h"
+#include <imgui.h>
 #include <cmath>
 #include <glm/vec3.hpp>
 
@@ -18,4 +19,11 @@ void dae::RotationComponent::Update()
                            0.f};
 
     GetOwner()->SetLocalPosition(offset);
+}
+
+void dae::RotationComponent::DrawInspector() const
+{
+    ImGui::Text("Radius: %.2f", m_radius);
+    ImGui::Text("Speed: %.2f", m_speed);
+    ImGui::Text("Angle: %.2f", m_angle);
 }

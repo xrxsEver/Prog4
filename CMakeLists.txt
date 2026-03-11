@@ -15,18 +15,24 @@ endif()
 
 # list source files here
 add_executable(${TARGET_NAME} ${TARGET_PARAM}
-  Minigin/CacheBenchmarkWindow.cpp
+  Minigin/AnalogStickMoveComponent.cpp
+  Minigin/Character.cpp
+  Minigin/ImGuiManager.cpp
   Minigin/Component.cpp
   Minigin/Font.cpp
   Minigin/GameObject.cpp
+  Minigin/Gamepad.cpp
   Minigin/InputManager.cpp
   Minigin/Main.cpp
   Minigin/Minigin.cpp
+  Minigin/MoveCommand.cpp
+  Minigin/PengoCharacter.cpp
   Minigin/Renderer.cpp
   Minigin/RenderComponent.cpp
   Minigin/ResourceManager.cpp
   Minigin/Scene.cpp
   Minigin/SceneManager.cpp
+  Minigin/SnoBeeCharacter.cpp
   Minigin/TextComponent.cpp
   Minigin/FPSComponent.cpp
   Minigin/RotationComponent.cpp
@@ -170,6 +176,10 @@ target_link_libraries("${TARGET_NAME}" PUBLIC
         imgui
         ${VLD_LIBRARIES}
 )
+
+if(WIN32 AND NOT EMSCRIPTEN)
+  target_link_libraries("${TARGET_NAME}" PRIVATE xinput)
+endif()
 
 if(MSVC)
   # compile at warning level 4 + treat warnings as errors

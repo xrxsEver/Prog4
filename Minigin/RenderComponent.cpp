@@ -3,6 +3,7 @@
 #include "Renderer.h"
 #include "ResourceManager.h"
 #include "Texture2D.h"
+#include <imgui.h>
 
 dae::RenderComponent::RenderComponent(GameObject *pOwner)
     : Component(pOwner)
@@ -50,4 +51,23 @@ void dae::RenderComponent::SetSourceRect(float x, float y, float w, float h)
 void dae::RenderComponent::SetRenderSize(float w, float h)
 {
     m_dstSize = SDL_FRect{0.f, 0.f, w, h};
+}
+
+void dae::RenderComponent::DrawInspector() const
+{
+    ImGui::Text("Texture: %s", m_texture ? "loaded" : "none");
+
+    if (m_srcRect)
+    {
+        ImGui::Text("Source: %.0f, %.0f, %.0f, %.0f", m_srcRect->x, m_srcRect->y, m_srcRect->w, m_srcRect->h);
+    }
+    else
+    {
+        ImGui::TextDisabled("Source: full texture");
+    }
+
+    if (m_dstSize)
+    {
+        ImGui::Text("Render size: %.0f x %.0f", m_dstSize->w, m_dstSize->h);
+    }
 }

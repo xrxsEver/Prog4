@@ -18,6 +18,7 @@
 #include "Renderer.h"
 #include "ResourceManager.h"
 #include "GameTime.h"
+#include "ImGuiManager.h"
 
 SDL_Window *g_window{};
 
@@ -61,9 +62,9 @@ dae::Minigin::Minigin(const std::filesystem::path &dataPath)
 {
 	PrintSDLVersion();
 
-	if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
+	if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
 	{
-		SDL_Log("Renderer error: %s", SDL_GetError());
+		SDL_Log("SDL init error: %s", SDL_GetError());
 		throw std::runtime_error(std::string("SDL_Init Error: ") + SDL_GetError());
 	}
 
@@ -78,11 +79,13 @@ dae::Minigin::Minigin(const std::filesystem::path &dataPath)
 	}
 
 	Renderer::GetInstance().Init(g_window);
+	ImGuiManager::GetInstance().Init(g_window, Renderer::GetInstance().GetSDLRenderer());
 	ResourceManager::GetInstance().Init(dataPath);
 }
 
 dae::Minigin::~Minigin()
 {
+	ImGuiManager::GetInstance().ShutDown();
 	Renderer::GetInstance().Destroy();
 	SDL_DestroyWindow(g_window);
 	g_window = nullptr;
@@ -120,7 +123,11 @@ void dae::Minigin::Run(const std::function<void()> &load)
 
 		// normal update - runs every frame
 		SceneManager::GetInstance().Update();
+
+		ImGuiManager::GetInstance().BeginFrame();
 		Renderer::GetInstance().Render();
+		ImGuiManager::GetInstance().EndFrame(Renderer::GetInstance().GetSDLRenderer());
+		SDL_RenderPresent(Renderer::GetInstance().GetSDLRenderer());
 
 		// cap frame rate so it's the same on all devices
 		auto frameEnd = std::chrono::high_resolution_clock::now();
@@ -145,5 +152,9 @@ void dae::Minigin::RunOneFrame()
 
 	m_quit = !InputManager::GetInstance().ProcessInput();
 	SceneManager::GetInstance().Update();
+
+	ImGuiManager::GetInstance().BeginFrame();
 	Renderer::GetInstance().Render();
+	ImGuiManager::GetInstance().EndFrame(Renderer::GetInstance().GetSDLRenderer());
+	SDL_RenderPresent(Renderer::GetInstance().GetSDLRenderer());
 }

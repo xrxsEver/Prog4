@@ -3,6 +3,11 @@
 
 #include <algorithm>
 
+dae::GameObject::GameObject(std::string name)
+	: m_name(std::move(name))
+{
+}
+
 dae::GameObject::~GameObject()
 {
 	// Detach from parent
@@ -20,7 +25,6 @@ dae::GameObject::~GameObject()
 	m_children.clear();
 }
 // this can be changed to a simpler destrucor ,!gameobject()= defaulte
-
 
 void dae::GameObject::Update()
 {
@@ -62,6 +66,11 @@ const glm::vec3 &dae::GameObject::GetWorldPosition()
 {
 	UpdateWorldPosition();
 	return m_transform.GetPosition();
+}
+
+void dae::GameObject::SetName(std::string name)
+{
+	m_name = std::move(name);
 }
 
 void dae::GameObject::MarkForDelete()

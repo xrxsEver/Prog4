@@ -5,6 +5,7 @@
 #include "Renderer.h"
 #include "Font.h"
 #include "Texture2D.h"
+#include <imgui.h>
 
 dae::TextComponent::TextComponent(GameObject *pOwner, const std::string &text, std::shared_ptr<Font> font, const SDL_Color &color)
     : Component(pOwner), m_text(text), m_color(color), m_font(std::move(font))
@@ -46,4 +47,11 @@ void dae::TextComponent::SetColor(const SDL_Color &color)
 {
     m_color = color;
     m_needsUpdate = true;
+}
+
+void dae::TextComponent::DrawInspector() const
+{
+    ImGui::TextWrapped("Text: %s", m_text.c_str());
+    ImGui::Text("Color: %u, %u, %u, %u", m_color.r, m_color.g, m_color.b, m_color.a);
+    ImGui::Text("Dirty: %s", m_needsUpdate ? "yes" : "no");
 }

@@ -2,6 +2,7 @@
 #include <vector>
 #include <memory>
 #include <algorithm>
+#include <string>
 #include <glm/vec3.hpp>
 #include "Transform.h"
 
@@ -9,7 +10,7 @@ namespace dae
 {
 	class Component;
 
-	class GameObject final
+	class GameObject
 	{
 	public:
 		void Update();
@@ -29,6 +30,9 @@ namespace dae
 		const glm::vec3 &GetWorldPosition();
 		Transform &GetTransform();
 		const Transform &GetTransform() const;
+		void SetName(std::string name);
+		const std::string &GetName() const { return m_name; }
+		const std::vector<std::unique_ptr<Component>> &GetComponents() const { return m_components; }
 
 		// component system
 		template <typename T, typename... Args>
@@ -68,8 +72,8 @@ namespace dae
 				m_components.end());
 		}
 
-		GameObject() = default;
-		~GameObject();
+		explicit GameObject(std::string name = "GameObject");
+		virtual ~GameObject();
 		GameObject(const GameObject &other) = delete;
 		GameObject(GameObject &&other) = delete;
 		GameObject &operator=(const GameObject &other) = delete;
@@ -89,5 +93,6 @@ namespace dae
 		std::vector<GameObject *> m_children{};
 		std::vector<std::unique_ptr<Component>> m_components{};
 		bool m_isMarkedForDelete{};
+		std::string m_name{};
 	};
 }
