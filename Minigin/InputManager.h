@@ -20,7 +20,7 @@ namespace dae
 	class InputManager final : public Singleton<InputManager>
 	{
 	public:
-		static constexpr std::uint32_t AnyGamepad = std::numeric_limits<std::uint32_t>::max();
+		static constexpr std::uint32_t AnyGamepad = (std::numeric_limits<std::uint32_t>::max)();
 
 		InputManager();
 		~InputManager();
