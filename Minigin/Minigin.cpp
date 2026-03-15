@@ -121,6 +121,8 @@ void dae::Minigin::Run(const std::function<void()> &load)
 			lag -= fixedTimeStep;
 		}
 
+		m_achievements.Update();
+
 		// normal update - runs every frame
 		SceneManager::GetInstance().Update();
 
@@ -151,6 +153,7 @@ void dae::Minigin::RunOneFrame()
 	GameTime::GetInstance().SetDeltaTime(deltaTime);
 
 	m_quit = !InputManager::GetInstance().ProcessInput();
+	m_achievements.Update();
 	SceneManager::GetInstance().Update();
 
 	ImGuiManager::GetInstance().BeginFrame();

@@ -117,7 +117,9 @@ if(Steamworks_FOUND)
     endif()
 
     if(NOT TARGET Steamworks::Steamworks)
-        add_library(Steamworks::Steamworks INTERFACE IMPORTED)
+        add_library(Steamworks::Steamworks INTERFACE IMPORTED
+                ../../Minigin/Achievements.cpp
+                ../../Minigin/Achievements.h)
 
         set_target_properties(Steamworks::Steamworks PROPERTIES
             INTERFACE_INCLUDE_DIRECTORIES "${Steamworks_INCLUDE_DIRS}"

@@ -157,6 +157,7 @@ void dae::ImGuiManager::RenderOverlay()
         RenderInspector();
         ImGui::Spacing();
         RenderInputMonitor();
+        //sImGui::ShowDemoWindow();
     }
     ImGui::End();
 }

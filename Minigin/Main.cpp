@@ -17,9 +17,12 @@
 #include "RotationComponent.h"
 #include "Scene.h"
 #include "PengoCharacter.h"
+#include "RemainingLivesDisplayComponent.h"
+#include "ScoreDisplayComponent.h"
 #include "SnoBeeCharacter.h"
 
 #include <filesystem>
+#include <vector>
 namespace fs = std::filesystem;
 
 static void load()
@@ -67,14 +70,44 @@ static void load()
 	input.ClearBindings();
 
 	auto pengo = std::make_unique<dae::PengoCharacter>();
+	auto *pengoPtr = pengo.get();
 	pengo->SetPosition(384, 288);
 	pengo->BindKeyboardControls();
 	scene.Add(std::move(pengo));
 
 	auto snoBee = std::make_unique<dae::SnoBeeCharacter>();
+	auto *snoBeePtr = snoBee.get();
 	snoBee->SetPosition(576, 288);
 	snoBee->BindGamepadControls(dae::InputManager::AnyGamepad);
 	scene.Add(std::move(snoBee));
+
+	auto pengoLivesDisplay = std::make_unique<dae::GameObject>("Pengo Lives");
+	pengoLivesDisplay->AddComponent<dae::TextComponent>("Pengo lives: 3", fpsFont, SDL_Color{255, 255, 255, 255});
+	pengoLivesDisplay->AddComponent<dae::RemainingLivesDisplayComponent>(pengoPtr, "Pengo lives");
+	pengoLivesDisplay->SetPosition(20, 52);
+	pengoLivesDisplay->SetParent(canvasPtr, false);
+	scene.Add(std::move(pengoLivesDisplay));
+
+	auto snoBeeLivesDisplay = std::make_unique<dae::GameObject>("SnoBee Lives");
+	snoBeeLivesDisplay->AddComponent<dae::TextComponent>("SnoBee lives: 3", fpsFont, SDL_Color{255, 255, 255, 255});
+	snoBeeLivesDisplay->AddComponent<dae::RemainingLivesDisplayComponent>(snoBeePtr, "SnoBee lives");
+	snoBeeLivesDisplay->SetPosition(20, 84);
+	snoBeeLivesDisplay->SetParent(canvasPtr, false);
+	scene.Add(std::move(snoBeeLivesDisplay));
+
+	auto pengoPointsDisplay = std::make_unique<dae::GameObject>("Pengo Points");
+	pengoPointsDisplay->AddComponent<dae::TextComponent>("Pengo points: 0", fpsFont, SDL_Color{255, 255, 255, 255});
+	pengoPointsDisplay->AddComponent<dae::ScoreDisplayComponent>(std::vector<dae::Character *>{pengoPtr}, "Pengo points");
+	pengoPointsDisplay->SetPosition(20, 116);
+	pengoPointsDisplay->SetParent(canvasPtr, false);
+	scene.Add(std::move(pengoPointsDisplay));
+
+	auto snoBeePointsDisplay = std::make_unique<dae::GameObject>("SnoBee Points");
+	snoBeePointsDisplay->AddComponent<dae::TextComponent>("SnoBee points: 0", fpsFont, SDL_Color{255, 255, 255, 255});
+	snoBeePointsDisplay->AddComponent<dae::ScoreDisplayComponent>(std::vector<dae::Character *>{snoBeePtr}, "SnoBee points");
+	snoBeePointsDisplay->SetPosition(20, 148);
+	snoBeePointsDisplay->SetParent(canvasPtr, false);
+	scene.Add(std::move(snoBeePointsDisplay));
 }
 
 int main(int, char*[]) {

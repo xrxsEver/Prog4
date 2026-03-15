@@ -3,11 +3,15 @@
 #include <functional>
 #include <filesystem>
 
+#include "Achievements.h"
+
 namespace dae
 {
 	class Minigin final
 	{
 		bool m_quit{};
+		Achievements m_achievements{};
+
 	public:
 		explicit Minigin(const std::filesystem::path& dataPath);
 		~Minigin();

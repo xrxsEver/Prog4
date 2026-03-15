@@ -7,14 +7,28 @@ endif()
 
 if(EMSCRIPTEN)
   set(TARGET_NAME minigin_web)
-  set(TARGET_PARAM )
+  set(TARGET_PARAM
+          Minigin/Subject.cpp
+          Minigin/Subject.h
+          Minigin/Observer.h
+          Minigin/EventManager.h
+          Minigin/Achievements.cpp
+          Minigin/Achievements.h)
 else()
   set(TARGET_NAME minigin)
-  set(TARGET_PARAM WIN32)
+  set(TARGET_PARAM WIN32
+          Minigin/Subject.cpp
+          Minigin/Subject.h
+          Minigin/Observer.h
+          Minigin/Event.h
+          Minigin/EventManager.h
+          Minigin/Achievements.cpp
+          Minigin/Achievements.h)
 endif()
 
 # list source files here
 add_executable(${TARGET_NAME} ${TARGET_PARAM}
+  Minigin/AddScoreCommand.cpp
   Minigin/AnalogStickMoveComponent.cpp
   Minigin/Character.cpp
   Minigin/ImGuiManager.cpp
@@ -25,8 +39,11 @@ add_executable(${TARGET_NAME} ${TARGET_PARAM}
   Minigin/InputManager.cpp
   Minigin/Main.cpp
   Minigin/Minigin.cpp
+  Minigin/LoseLifeCommand.cpp
   Minigin/MoveCommand.cpp
   Minigin/PengoCharacter.cpp
+  Minigin/RemainingLivesDisplayComponent.cpp
+  Minigin/ScoreDisplayComponent.cpp
   Minigin/Renderer.cpp
   Minigin/RenderComponent.cpp
   Minigin/ResourceManager.cpp
@@ -38,6 +55,13 @@ add_executable(${TARGET_NAME} ${TARGET_PARAM}
   Minigin/RotationComponent.cpp
   Minigin/Texture2D.cpp
   Minigin/Transform.cpp
+        Minigin/Subject.cpp
+        Minigin/Subject.h
+        Minigin/Observer.h
+        Minigin/Event.h
+        Minigin/EventManager.h
+        Minigin/Achievements.cpp
+        Minigin/Achievements.h
 )
 
 # enable c++20 features
