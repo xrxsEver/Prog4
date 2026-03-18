@@ -1,6 +1,7 @@
 #pragma once
 #include <SDL3/SDL.h>
 #include "Singleton.h"
+#include <string>
 
 namespace dae
 {
@@ -25,6 +26,9 @@ namespace dae
         void RenderHierarchyNode(GameObject &gameObject);
         void RenderInspector() const;
         void RenderInputMonitor() const;
+        void RenderEventMonitor() const;
+        void RenderAchievements();
+        void RenderEngineTabs();
         void ApplyModernStyle() const;
         bool IsSelectedObjectAlive() const;
 
@@ -33,5 +37,8 @@ namespace dae
         float m_fps{};
         GameObject *m_pSelectedGameObject{};
         bool m_isWindowOpen{true};
+        float m_sceneHierarchyHeight{260.0f};
+        bool m_confirmResetAllStats{};
+        std::string m_achievementActionFeedback{};
     };
 }

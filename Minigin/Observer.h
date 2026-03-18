@@ -6,7 +6,6 @@ namespace dae
     enum class GameEvent
     {
         PlayerDied,
-        ActorFell,
         PointsGained
     };
 

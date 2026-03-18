@@ -20,6 +20,7 @@
 #include "RemainingLivesDisplayComponent.h"
 #include "ScoreDisplayComponent.h"
 #include "SnoBeeCharacter.h"
+#include "Achievements.h"
 
 #include <filesystem>
 #include <vector>
@@ -81,6 +82,12 @@ static void load()
 	snoBee->BindGamepadControls(dae::InputManager::AnyGamepad);
 	scene.Add(std::move(snoBee));
 
+	if (dae::Achievements *achievements = dae::Achievements::GetActiveInstance(); achievements != nullptr)
+	{
+		achievements->ObserveCharacter(pengoPtr);
+		achievements->ObserveCharacter(snoBeePtr);
+	}
+
 	auto pengoLivesDisplay = std::make_unique<dae::GameObject>("Pengo Lives");
 	pengoLivesDisplay->AddComponent<dae::TextComponent>("Pengo lives: 3", fpsFont, SDL_Color{255, 255, 255, 255});
 	pengoLivesDisplay->AddComponent<dae::RemainingLivesDisplayComponent>(pengoPtr, "Pengo lives");
@@ -108,6 +115,18 @@ static void load()
 	snoBeePointsDisplay->SetPosition(20, 148);
 	snoBeePointsDisplay->SetParent(canvasPtr, false);
 	scene.Add(std::move(snoBeePointsDisplay));
+
+	auto controlsHintKeyboard = std::make_unique<dae::GameObject>("Controls Hint Keyboard");
+	controlsHintKeyboard->AddComponent<dae::TextComponent>("Pengo : X +10 points | V +100 points | C lose life", fpsFont, SDL_Color{210, 220, 235, 255});
+	controlsHintKeyboard->SetPosition(20, 520);
+	controlsHintKeyboard->SetParent(canvasPtr, false);
+	scene.Add(std::move(controlsHintKeyboard));
+
+	auto controlsHintGamepad = std::make_unique<dae::GameObject>("Controls Hint Gamepad");
+	controlsHintGamepad->AddComponent<dae::TextComponent>("SnoBee : A +10 points | B +100 points | X lose life", fpsFont, SDL_Color{210, 220, 235, 255});
+	controlsHintGamepad->SetPosition(20, 548);
+	controlsHintGamepad->SetParent(canvasPtr, false);
+	scene.Add(std::move(controlsHintGamepad));
 }
 
 int main(int, char*[]) {
