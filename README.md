@@ -10,6 +10,26 @@ Minigin is a very small project using [SDL3](https://www.libsdl.org/) and [glm](
 
 Minigin can/may be used as a start project for the exam assignment in the course [Programming 4](https://youtu.be/j96Oh6vzhmg) at DAE. In that assignment students need to recreate a popular 80's arcade game with a game engine they need to program themselves. During the course we discuss several game programming patterns, using the book '[Game Programming Patterns](https://gameprogrammingpatterns.com/)' by [Robert Nystrom](https://github.com/munificent) as reading material. 
 
+# Project Layout
+
+The codebase is split into two top-level source folders:
+
+- `Engine/`: reusable framework and runtime code.
+    - `Core/`: base runtime object model and engine loop.
+    - `Input/`: gamepad and input dispatch.
+    - `Rendering/`: renderer, textures, fonts, text and resources.
+    - `Scene/`: scene and scene manager.
+    - `UI/`: debug/editor UI windows.
+    - `Events/`: observer/subject and event contracts.
+- `Game/`: game-specific behavior and content.
+    - `App/`: game entry point and scene bootstrap.
+    - `Systems/`: game-level systems (achievements, shared state abstractions).
+    - `Characters/`: player and enemy entities.
+    - `Commands/`: gameplay commands bound to input.
+    - `Components/`: gameplay/UI components attached to game objects.
+
+This separation keeps engine concerns and game concerns isolated while still building into one executable through CMake.
+
 # Disclaimer
 
 Minigin is, despite perhaps the suggestion in its name, **not** a game engine. It is just a very simple SDL3 ready project with some of the scaffolding in place to get started. None of the patterns discussed in the course are used yet (except singleton which use we challenge during the course). It is up to the students to implement their own vision for their engine, apply patterns as they see fit, create their game as efficient as possible.

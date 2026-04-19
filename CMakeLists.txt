@@ -7,61 +7,69 @@ endif()
 
 if(EMSCRIPTEN)
   set(TARGET_NAME minigin_web)
-  set(TARGET_PARAM
-          Minigin/Subject.cpp
-          Minigin/Subject.h
-          Minigin/Observer.h
-          Minigin/EventManager.h
-          Minigin/Achievements.cpp
-          Minigin/Achievements.h)
+  set(TARGET_PARAM)
 else()
   set(TARGET_NAME minigin)
-  set(TARGET_PARAM WIN32
-          Minigin/Subject.cpp
-          Minigin/Subject.h
-          Minigin/Observer.h
-          Minigin/Event.h
-          Minigin/EventManager.h
-          Minigin/Achievements.cpp
-          Minigin/Achievements.h)
+  set(TARGET_PARAM WIN32)
 endif()
+
+set(ENGINE_SOURCES
+  Engine/Core/Component.cpp
+  Engine/Core/GameObject.cpp
+  Engine/Core/Minigin.cpp
+  Engine/Core/Transform.cpp
+  Engine/Input/Gamepad.cpp
+  Engine/Input/InputManager.cpp
+  Engine/Rendering/Font.cpp
+  Engine/Rendering/RenderComponent.cpp
+  Engine/Rendering/Renderer.cpp
+  Engine/Rendering/ResourceManager.cpp
+  Engine/Rendering/TextComponent.cpp
+  Engine/Rendering/Texture2D.cpp
+  Engine/Scene/Scene.cpp
+  Engine/Scene/SceneManager.cpp
+  Engine/UI/CacheBenchmarkWindow.cpp
+  Engine/UI/ImGuiManager.cpp
+  Engine/Events/Subject.cpp
+)
+
+set(GAME_SOURCES
+  Game/App/Main.cpp
+  Game/Systems/Achievements.cpp
+  Game/Commands/AddScoreCommand.cpp
+  Game/Commands/LoseLifeCommand.cpp
+  Game/Commands/MoveCommand.cpp
+  Game/Characters/Character.cpp
+  Game/Characters/PengoCharacter.cpp
+  Game/Characters/SnoBeeCharacter.cpp
+  Game/Components/AnalogStickMoveComponent.cpp
+  Game/Components/FPSComponent.cpp
+  Game/Components/RemainingLivesDisplayComponent.cpp
+  Game/Components/RotationComponent.cpp
+  Game/Components/ScoreDisplayComponent.cpp
+)
+
+set(ENGINE_INCLUDE_DIRS
+  ${CMAKE_SOURCE_DIR}/Engine/Core
+  ${CMAKE_SOURCE_DIR}/Engine/Input
+  ${CMAKE_SOURCE_DIR}/Engine/Rendering
+  ${CMAKE_SOURCE_DIR}/Engine/Scene
+  ${CMAKE_SOURCE_DIR}/Engine/UI
+  ${CMAKE_SOURCE_DIR}/Engine/Events
+)
+
+set(GAME_INCLUDE_DIRS
+  ${CMAKE_SOURCE_DIR}/Game/App
+  ${CMAKE_SOURCE_DIR}/Game/Systems
+  ${CMAKE_SOURCE_DIR}/Game/Characters
+  ${CMAKE_SOURCE_DIR}/Game/Commands
+  ${CMAKE_SOURCE_DIR}/Game/Components
+)
 
 # list source files here
 add_executable(${TARGET_NAME} ${TARGET_PARAM}
-  Minigin/AddScoreCommand.cpp
-  Minigin/AnalogStickMoveComponent.cpp
-  Minigin/Character.cpp
-  Minigin/ImGuiManager.cpp
-  Minigin/Component.cpp
-  Minigin/Font.cpp
-  Minigin/GameObject.cpp
-  Minigin/Gamepad.cpp
-  Minigin/InputManager.cpp
-  Minigin/Main.cpp
-  Minigin/Minigin.cpp
-  Minigin/LoseLifeCommand.cpp
-  Minigin/MoveCommand.cpp
-  Minigin/PengoCharacter.cpp
-  Minigin/RemainingLivesDisplayComponent.cpp
-  Minigin/ScoreDisplayComponent.cpp
-  Minigin/Renderer.cpp
-  Minigin/RenderComponent.cpp
-  Minigin/ResourceManager.cpp
-  Minigin/Scene.cpp
-  Minigin/SceneManager.cpp
-  Minigin/SnoBeeCharacter.cpp
-  Minigin/TextComponent.cpp
-  Minigin/FPSComponent.cpp
-  Minigin/RotationComponent.cpp
-  Minigin/Texture2D.cpp
-  Minigin/Transform.cpp
-        Minigin/Subject.cpp
-        Minigin/Subject.h
-        Minigin/Observer.h
-        Minigin/Event.h
-        Minigin/EventManager.h
-        Minigin/Achievements.cpp
-        Minigin/Achievements.h
+  ${ENGINE_SOURCES}
+  ${GAME_SOURCES}
 )
 
 # enable c++20 features
@@ -173,7 +181,12 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/steam")
 find_package(Steamworks QUIET)
 
 target_include_directories("${TARGET_NAME}" PUBLIC
-  ${CMAKE_SOURCE_DIR}/Minigin/
+  ${ENGINE_INCLUDE_DIRS}
+  ${GAME_INCLUDE_DIRS}
+  ${glm_SOURCE_DIR}
+  ${sdl3_SOURCE_DIR}/include
+  ${sdl3_ttf_SOURCE_DIR}/include
+  ${imgui_SOURCE_DIR}
   ${VLD_INCLUDE_DIR}
 )
 
@@ -181,24 +194,8 @@ target_link_libraries("${TARGET_NAME}" PUBLIC
   SDL3::SDL3
   SDL3_ttf::SDL3_ttf
   glm::glm
+  imgui
   ${VLD_LIBRARIES}
-)
-
-target_include_directories("${TARGET_NAME}" PUBLIC
-        ${CMAKE_SOURCE_DIR}/Minigin/
-        ${glm_SOURCE_DIR}
-        ${sdl3_SOURCE_DIR}/include
-        ${sdl3_image_SOURCE_DIR}/include
-        ${sdl3_ttf_SOURCE_DIR}/include
-        ${imgui_SOURCE_DIR}
-        ${VLD_INCLUDE_DIR}
-)
-
-target_link_libraries("${TARGET_NAME}" PUBLIC
-        SDL3::SDL3
-        SDL3_ttf::SDL3_ttf
-        imgui
-        ${VLD_LIBRARIES}
 )
 
 if(WIN32 AND NOT EMSCRIPTEN)
