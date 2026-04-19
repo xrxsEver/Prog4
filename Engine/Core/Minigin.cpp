@@ -24,7 +24,10 @@
 namespace
 {
 	using Clock = std::chrono::high_resolution_clock;
+
+#ifndef __EMSCRIPTEN__
 	constexpr auto g_DesiredFrameTime = std::chrono::milliseconds(16);
+#endif
 
 	void LogSDLVersion(const std::string_view message, const int major, const int minor, const int patch)
 	{
