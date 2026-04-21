@@ -17,7 +17,7 @@ namespace dae
         ScoreDisplayComponent(GameObject *pOwner, std::vector<Character *> observedCharacters, std::string labelPrefix = "Score");
         ~ScoreDisplayComponent() override;
 
-        void Update() override;
+        void Update(float deltaTime) override;
         void OnNotify(GameEvent event) override;
         const char *GetDebugName() const override { return "ScoreDisplay"; }
         void DrawInspector() const override;

@@ -17,7 +17,7 @@ namespace dae
         RemainingLivesDisplayComponent(GameObject *pOwner, Character *pCharacter, std::string labelPrefix);
         ~RemainingLivesDisplayComponent() override;
 
-        void Update() override;
+        void Update(float deltaTime) override;
         void OnNotify(GameEvent event) override;
         const char *GetDebugName() const override { return "RemainingLivesDisplay"; }
         void DrawInspector() const override;

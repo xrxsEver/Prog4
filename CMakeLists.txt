@@ -17,7 +17,6 @@ set(ENGINE_SOURCES
   Engine/Core/Component.cpp
   Engine/Core/GameObject.cpp
   Engine/Core/Minigin.cpp
-  Engine/Core/Transform.cpp
   Engine/Input/Gamepad.cpp
   Engine/Input/InputManager.cpp
   Engine/Rendering/Font.cpp

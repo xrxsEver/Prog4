@@ -14,7 +14,7 @@ namespace dae
 		void RemoveAll();
 		const std::vector<std::unique_ptr<GameObject>> &GetObjects() const { return m_objects; }
 
-		void Update();
+		void Update(float deltaTime);
 		void FixedUpdate();
 		void Render() const;
 

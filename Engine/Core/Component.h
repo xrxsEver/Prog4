@@ -9,7 +9,7 @@ namespace dae
     class Component
     {
     public:
-        virtual void Update() {}
+        virtual void Update(float deltaTime) { (void)deltaTime; }
         virtual void FixedUpdate() {}
         virtual void Render() const {}
         virtual const char *GetDebugName() const { return "Component"; }

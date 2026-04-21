@@ -9,24 +9,14 @@ dae::Character::Character(std::string name, ResourceManager &resourceManager)
 {
 }
 
-int dae::Character::GetHealth() const
-{
-    return m_health;
-}
-
-int dae::Character::GetScore() const
-{
-    return m_score;
-}
-
 void dae::Character::LoseLife()
 {
-    if (m_health <= 0)
+    if (health <= 0)
     {
         return;
     }
 
-    m_health = (std::max)(0, m_health - 1);
+    health = (std::max)(0, health - 1);
     NotifyObservers(GameEvent::PlayerDied);
 }
 
@@ -37,7 +27,7 @@ void dae::Character::AddScore(const int points)
         return;
     }
 
-    m_score += points;
+    score += points;
     NotifyObservers(GameEvent::PointsGained);
 }
 

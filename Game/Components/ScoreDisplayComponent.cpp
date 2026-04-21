@@ -17,7 +17,7 @@ namespace
         {
             if (character != nullptr)
             {
-                totalScore += character->GetScore();
+                totalScore += character->score;
             }
         }
         return totalScore;
@@ -47,8 +47,10 @@ dae::ScoreDisplayComponent::~ScoreDisplayComponent()
     }
 }
 
-void dae::ScoreDisplayComponent::Update()
+void dae::ScoreDisplayComponent::Update(float deltaTime)
 {
+    (void)deltaTime;
+
     if (m_pTextComponent == nullptr)
     {
         m_pTextComponent = GetOwner()->GetComponent<TextComponent>();

@@ -12,10 +12,12 @@ namespace dae
     {
     public:
         Character(std::string name, ResourceManager &resourceManager);
-        int GetHealth() const;
-        int GetScore() const;
         void LoseLife();
         void AddScore(int points);
+
+        // Public data members (C.131) - no invariants to protect
+        int health{m_startHealth};
+        int score{0};
 
     protected:
         void InitializeSprite(float sourceX, float sourceY);
@@ -26,8 +28,6 @@ namespace dae
         static constexpr int m_startHealth{5};
 
     protected:
-        int m_health{m_startHealth};
-        int m_score{0};
         ResourceManager &m_resourceManager;
     };
 }

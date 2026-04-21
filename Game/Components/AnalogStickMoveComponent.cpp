@@ -15,7 +15,7 @@ dae::AnalogStickMoveComponent::AnalogStickMoveComponent(GameObject *pOwner, Inpu
 {
 }
 
-void dae::AnalogStickMoveComponent::Update()
+void dae::AnalogStickMoveComponent::Update(float deltaTime)
 {
     if (m_pInputManager == nullptr)
     {
@@ -40,7 +40,6 @@ void dae::AnalogStickMoveComponent::Update()
 
     const glm::vec2 direction = rawStick / magnitude;
     const float normalizedMagnitude = std::clamp((magnitude - deadzone) / (32767.0f - deadzone), 0.0f, 1.0f);
-    const float deltaTime = GameTime::GetInstance().GetDeltaTime();
     const glm::vec3 currentPos = GetOwner()->GetLocalPosition();
     const glm::vec3 movement{
         direction.x * normalizedMagnitude * m_speed * deltaTime,

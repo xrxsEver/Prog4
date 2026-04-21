@@ -8,6 +8,6 @@ void dae::Component::RenderTextureAtOwnerPosition(const std::shared_ptr<Texture2
     if (!texture)
         return;
 
-    const auto &pos = GetOwner()->GetTransform().GetPosition();
+    const auto &pos = GetOwner()->GetTransform().position;
     Renderer::GetInstance().RenderTexture(*texture, pos.x, pos.y);
 }

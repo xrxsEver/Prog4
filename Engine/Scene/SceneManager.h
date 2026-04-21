@@ -15,7 +15,7 @@ namespace dae
 		const std::vector<std::unique_ptr<Scene>> &GetScenes() const { return m_scenes; }
 		void RemoveAllScenes();
 
-		void Update();
+		void Update(float deltaTime);
 		void FixedUpdate();
 		void Render();
 

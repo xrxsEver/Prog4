@@ -76,7 +76,7 @@ void dae::Achievements::OnNotify(const GameEvent event)
 
     for (const Character *character : m_observedCharacters)
     {
-        if (character != nullptr && character->GetScore() >= m_winScoreThreshold)
+        if (character != nullptr && character->score >= m_winScoreThreshold)
         {
             m_winnerAchievementUnlocked = Unlock("ACH_WIN_ONE_GAME");
             return;

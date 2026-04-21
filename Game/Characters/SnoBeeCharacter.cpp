@@ -79,7 +79,7 @@ namespace
             ChangeState(dae::EnemyState::Idle);
         }
 
-        void Update() override
+        void Update(float deltaTime) override
         {
             auto *owner = GetOwner();
             if (owner == nullptr)
@@ -93,7 +93,6 @@ namespace
                 return;
             }
 
-            const float deltaTime = dae::GameTime::GetInstance().GetDeltaTime();
             if (m_pCurrentState)
             {
                 m_pCurrentState->Update(*owner, deltaTime);
@@ -119,7 +118,7 @@ namespace
 
         dae::EnemyState DetermineState(const dae::GameObject &owner, const dae::Character &character) const
         {
-            if (character.GetHealth() <= 0)
+            if (character.health <= 0)
             {
                 return dae::EnemyState::Dying;
             }

@@ -3,13 +3,9 @@
 
 namespace dae
 {
-	class Transform final
+	// Pure data container - no invariants, so using struct with public members (C.131)
+	struct Transform final
 	{
-	public:
-		const glm::vec3& GetPosition() const { return m_position; }
-		void SetPosition(float x, float y, float z = 0);
-		void SetPosition(const glm::vec3& position);
-	private:
-		glm::vec3 m_position;
+		glm::vec3 position{};
 	};
 }

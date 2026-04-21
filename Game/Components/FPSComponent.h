@@ -10,7 +10,7 @@ namespace dae
     public:
         explicit FPSComponent(GameObject *pOwner);
 
-        void Update() override;
+        void Update(float deltaTime) override;
         const char *GetDebugName() const override { return "FPS"; }
         void DrawInspector() const override;
 

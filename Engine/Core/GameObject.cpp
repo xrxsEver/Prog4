@@ -26,11 +26,11 @@ dae::GameObject::~GameObject()
 }
 // this can be changed to a simpler destrucor ,!gameobject()= defaulte
 
-void dae::GameObject::Update()
+void dae::GameObject::Update(float deltaTime)
 {
 	for (auto &comp : m_components)
 	{
-		comp->Update();
+		comp->Update(deltaTime);
 	}
 }
 
@@ -65,7 +65,7 @@ void dae::GameObject::SetLocalPosition(const glm::vec3 &pos)
 const glm::vec3 &dae::GameObject::GetWorldPosition()
 {
 	UpdateWorldPosition();
-	return m_transform.GetPosition();
+	return m_transform.position;
 }
 
 void dae::GameObject::SetName(std::string name)
@@ -174,9 +174,9 @@ void dae::GameObject::UpdateWorldPosition() const
 	glm::vec3 worldPosition = m_localPosition;
 	if (m_pParent != nullptr)
 	{
-		worldPosition += m_pParent->GetTransform().GetPosition();
+		worldPosition += m_pParent->GetTransform().position;
 	}
-	m_transform.SetPosition(worldPosition);
+	m_transform.position = worldPosition;
 	m_isPositionDirty = false;
 }
 

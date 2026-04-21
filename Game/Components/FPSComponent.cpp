@@ -10,7 +10,7 @@ dae::FPSComponent::FPSComponent(GameObject *pOwner)
 {
 }
 
-void dae::FPSComponent::Update()
+void dae::FPSComponent::Update(float deltaTime)
 {
     if (!m_pTextComponent)
     {
@@ -20,7 +20,6 @@ void dae::FPSComponent::Update()
     if (!m_pTextComponent)
         return;
 
-    float deltaTime = GameTime::GetInstance().GetDeltaTime();
     m_elapsedTime += deltaTime;
     ++m_frameCount;
 

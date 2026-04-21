@@ -13,7 +13,7 @@ namespace dae
     public:
         AnalogStickMoveComponent(GameObject *pOwner, InputManager &inputManager, std::uint32_t gamepadIndex, float speed, float deadzoneScale = 1.0f);
 
-        void Update() override;
+        void Update(float deltaTime) override;
         const char *GetDebugName() const override { return "Analog Move"; }
         void DrawInspector() const override;
 

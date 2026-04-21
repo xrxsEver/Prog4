@@ -14,7 +14,7 @@ namespace dae
     public:
         TextComponent(GameObject *pOwner, const std::string &text, std::shared_ptr<Font> font, const SDL_Color &color = {255, 255, 255, 255});
 
-        void Update() override;
+        void Update(float deltaTime) override;
         void Render() const override;
         const char *GetDebugName() const override { return "Text"; }
         void DrawInspector() const override;

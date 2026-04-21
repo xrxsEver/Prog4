@@ -127,7 +127,7 @@ void dae::Minigin::RunFrame(const float deltaTime)
 	}
 
 	m_achievements.Update();
-	m_sceneManager.Update();
+	m_sceneManager.Update(deltaTime);
 
 	auto &renderer = Renderer::GetInstance();
 	auto &imgui = ImGuiManager::GetInstance();

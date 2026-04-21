@@ -13,7 +13,7 @@ namespace dae
 	class GameObject
 	{
 	public:
-		void Update();
+		void Update(float deltaTime);
 		void FixedUpdate();
 		void Render() const;
 

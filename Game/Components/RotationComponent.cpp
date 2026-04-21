@@ -10,9 +10,9 @@ dae::RotationComponent::RotationComponent(GameObject *pOwner, float radius, floa
 {
 }
 
-void dae::RotationComponent::Update()
+void dae::RotationComponent::Update(float deltaTime)
 {
-    m_angle += m_speed * GameTime::GetInstance().GetDeltaTime();
+    m_angle += m_speed * deltaTime;
 
     const glm::vec3 offset{m_radius * std::cos(m_angle),
                            m_radius * std::sin(m_angle),

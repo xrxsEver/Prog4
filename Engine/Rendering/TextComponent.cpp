@@ -41,8 +41,10 @@ dae::TextComponent::TextComponent(GameObject *pOwner, const std::string &text, s
 {
 }
 
-void dae::TextComponent::Update()
+void dae::TextComponent::Update(float deltaTime)
 {
+    (void)deltaTime;
+
     if (m_needsUpdate)
     {
         SurfacePtr surf{TTF_RenderText_Blended(m_font->GetFont(), m_text.c_str(), m_text.length(), m_color)};

@@ -15,7 +15,7 @@ void dae::RenderComponent::Render() const
     if (!m_texture)
         return;
 
-    const auto &pos = GetOwner()->GetTransform().GetPosition();
+    const auto &pos = GetOwner()->GetTransform().position;
 
     if (m_srcRect.has_value())
     {

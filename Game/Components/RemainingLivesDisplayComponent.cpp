@@ -30,8 +30,10 @@ dae::RemainingLivesDisplayComponent::~RemainingLivesDisplayComponent()
     }
 }
 
-void dae::RemainingLivesDisplayComponent::Update()
+void dae::RemainingLivesDisplayComponent::Update(float deltaTime)
 {
+    (void)deltaTime;
+
     if (m_pTextComponent == nullptr)
     {
         m_pTextComponent = GetOwner()->GetComponent<TextComponent>();
@@ -42,7 +44,7 @@ void dae::RemainingLivesDisplayComponent::Update()
         return;
     }
 
-    if (m_cachedLives != m_pCharacter->GetHealth())
+    if (m_cachedLives != m_pCharacter->health)
     {
         RefreshText();
     }
@@ -69,6 +71,6 @@ void dae::RemainingLivesDisplayComponent::RefreshText()
         return;
     }
 
-    m_cachedLives = m_pCharacter->GetHealth();
+    m_cachedLives = m_pCharacter->health;
     m_pTextComponent->SetText(m_labelPrefix + ": " + std::to_string(m_cachedLives));
 }
