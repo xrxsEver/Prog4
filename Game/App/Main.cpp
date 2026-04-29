@@ -28,6 +28,7 @@
 
 #include "ServiceLocator.h"
 #include "SDLSoundSystem.h"
+#include "NullSoundSystem.h"
 #include "LoggingSoundSystem.h"
 
 namespace fs = std::filesystem;
@@ -74,12 +75,13 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	scene.Add(std::move(go));
 
 	inputManager.ClearBindings();
-	
+
 	// Maze Intro - Moved earlier to be in the background
 	auto mazeIntro = std::make_unique<dae::GameObject>("Maze Intro");
-	mazeIntro->AddComponent<dae::MazeDrawingComponent>(resourceManager, []() {
-		// Callback when finished
-	});
+	mazeIntro->AddComponent<dae::MazeDrawingComponent>(resourceManager, []()
+													   {
+														   // Callback when finished
+													   });
 	mazeIntro->SetPosition(272, 16);
 	scene.Add(std::move(mazeIntro));
 
@@ -142,19 +144,25 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	scene.Add(std::move(controlsHintGamepad));
 }
 
-int main(int, char*[]) {
+int main(int, char *[])
+{
 #if __EMSCRIPTEN__
 	fs::path data_location = "";
 #else
 	fs::path data_location = "./Data/";
-	if(!fs::exists(data_location))
+	if (!fs::exists(data_location))
 		data_location = "../Data/";
 #endif
 	dae::Minigin engine(data_location);
 
 	// Audio Service Locator Setup
+#ifdef __EMSCRIPTEN__
+	// Emscripten doesn't support SDL audio device enumeration, use null system
+	dae::ServiceLocator::register_sound_system(std::make_unique<dae::NullSoundSystem>());
+#else
 	auto sdl_ss = std::make_unique<dae::SDLSoundSystem>(data_location.string());
 	dae::ServiceLocator::register_sound_system(std::make_unique<dae::LoggingSoundSystem>(std::move(sdl_ss)));
+#endif
 
 	// The startup sound is now handled by the MazeDrawingComponent
 	// dae::ServiceLocator::get_sound_system().play_music((data_location / "Sounds/Start.mp3").string(), 0.3f, false);
