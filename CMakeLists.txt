@@ -30,11 +30,16 @@ set(ENGINE_SOURCES
   Engine/UI/CacheBenchmarkWindow.cpp
   Engine/UI/ImGuiManager.cpp
   Engine/Events/Subject.cpp
+  Engine/Audio/ServiceLocator.cpp
+  Engine/Audio/SDLSoundSystem.cpp
+  Engine/Audio/LoggingSoundSystem.cpp
+  Engine/Audio/AudioLogger.cpp
 )
 
 set(GAME_SOURCES
   Game/App/Main.cpp
   Game/Systems/Achievements.cpp
+  Game/Systems/MazeGenerator.cpp
   Game/Commands/AddScoreCommand.cpp
   Game/Commands/LoseLifeCommand.cpp
   Game/Commands/MoveCommand.cpp
@@ -46,6 +51,7 @@ set(GAME_SOURCES
   Game/Components/RemainingLivesDisplayComponent.cpp
   Game/Components/RotationComponent.cpp
   Game/Components/ScoreDisplayComponent.cpp
+  Game/Components/MazeDrawingComponent.cpp
 )
 
 set(ENGINE_INCLUDE_DIRS
@@ -55,6 +61,7 @@ set(ENGINE_INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR}/Engine/Scene
   ${CMAKE_SOURCE_DIR}/Engine/UI
   ${CMAKE_SOURCE_DIR}/Engine/Events
+  ${CMAKE_SOURCE_DIR}/Engine/Audio
 )
 
 set(GAME_INCLUDE_DIRS
@@ -146,6 +153,30 @@ if(NOT SDL3_ttf_FOUND)
   endif()
 endif()
 
+# Add SDL3_mixer
+find_package(SDL3_mixer 3.0 CONFIG QUIET)
+if(NOT SDL3_mixer_FOUND)
+  if (WIN32)
+    FetchContent_Declare(
+      SDL3_mixer
+      GIT_REPOSITORY https://github.com/libsdl-org/SDL_mixer.git
+      GIT_TAG release-3.2.0
+      GIT_SHALLOW TRUE
+      GIT_PROGRESS TRUE
+    )
+    FetchContent_MakeAvailable(SDL3_mixer)
+  else()
+    FetchContent_Declare(
+      SDL3_mixer
+      GIT_REPOSITORY https://github.com/libsdl-org/SDL_mixer.git
+      GIT_TAG release-3.2.0
+      GIT_SHALLOW TRUE
+      GIT_PROGRESS TRUE
+    )
+    FetchContent_MakeAvailable(SDL3_mixer)
+  endif()
+endif()
+
 # Dear ImGui
 FetchContent_Declare(
         imgui
@@ -185,6 +216,7 @@ target_include_directories("${TARGET_NAME}" PUBLIC
   ${glm_SOURCE_DIR}
   ${sdl3_SOURCE_DIR}/include
   ${sdl3_ttf_SOURCE_DIR}/include
+  ${sdl3_mixer_SOURCE_DIR}/include
   ${imgui_SOURCE_DIR}
   ${VLD_INCLUDE_DIR}
 )
@@ -192,6 +224,7 @@ target_include_directories("${TARGET_NAME}" PUBLIC
 target_link_libraries("${TARGET_NAME}" PUBLIC
   SDL3::SDL3
   SDL3_ttf::SDL3_ttf
+  SDL3_mixer::SDL3_mixer
   glm::glm
   imgui
   ${VLD_LIBRARIES}
@@ -238,6 +271,7 @@ elseif(WIN32)
   set(SDL_RUNTIME_DLLS
     SDL3::SDL3
     SDL3_ttf::SDL3_ttf
+    SDL3_mixer::SDL3_mixer
   )
 
   foreach(dllTarget IN LISTS SDL_RUNTIME_DLLS)

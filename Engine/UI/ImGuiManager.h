@@ -2,6 +2,8 @@
 #include <SDL3/SDL.h>
 #include "Singleton.h"
 #include <string>
+#include <vector>
+#include <functional>
 
 namespace dae
 {
@@ -17,6 +19,7 @@ namespace dae
 
         void BeginFrame();
         void EndFrame(SDL_Renderer *renderer);
+        void AddCustomTab(const std::string& name, std::function<void()> renderFunc);
 
     private:
         friend class Singleton<ImGuiManager>;
@@ -29,7 +32,7 @@ namespace dae
         void RenderInspector() const;
         void RenderInputMonitor() const;
         void RenderEventMonitor() const;
-        void RenderAchievements();
+        void RenderAudioLog() const;
         void RenderEngineTabs();
         void ApplyModernStyle() const;
         bool IsSelectedObjectAlive() const;
@@ -44,5 +47,6 @@ namespace dae
         std::string m_achievementActionFeedback{};
         SceneManager *m_pSceneManager{};
         InputManager *m_pInputManager{};
+        std::vector<std::pair<std::string, std::function<void()>>> m_customTabs;
     };
 }

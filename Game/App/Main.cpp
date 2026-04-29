@@ -21,9 +21,15 @@
 #include "ScoreDisplayComponent.h"
 #include "SnoBeeCharacter.h"
 #include "Achievements.h"
+#include "MazeDrawingComponent.h"
 
 #include <filesystem>
 #include <vector>
+
+#include "ServiceLocator.h"
+#include "SDLSoundSystem.h"
+#include "LoggingSoundSystem.h"
+
 namespace fs = std::filesystem;
 
 static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resourceManager, dae::InputManager &inputManager)
@@ -68,6 +74,14 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	scene.Add(std::move(go));
 
 	inputManager.ClearBindings();
+	
+	// Maze Intro - Moved earlier to be in the background
+	auto mazeIntro = std::make_unique<dae::GameObject>("Maze Intro");
+	mazeIntro->AddComponent<dae::MazeDrawingComponent>(resourceManager, []() {
+		// Callback when finished
+	});
+	mazeIntro->SetPosition(272, 16);
+	scene.Add(std::move(mazeIntro));
 
 	auto pengo = std::make_unique<dae::PengoCharacter>(resourceManager);
 	auto *pengoPtr = pengo.get();
@@ -116,14 +130,14 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	scene.Add(std::move(snoBeePointsDisplay));
 
 	auto controlsHintKeyboard = std::make_unique<dae::GameObject>("Controls Hint Keyboard");
-	controlsHintKeyboard->AddComponent<dae::TextComponent>("Pengo : X +10 points | V +100 points | C lose life", fpsFont, SDL_Color{210, 220, 235, 255});
-	controlsHintKeyboard->SetPosition(20, 520);
+	controlsHintKeyboard->AddComponent<dae::TextComponent>("Pengo :  C lose life for sound", fpsFont, SDL_Color{210, 220, 235, 255});
+	controlsHintKeyboard->SetPosition(20, 200);
 	controlsHintKeyboard->SetParent(canvasPtr, false);
 	scene.Add(std::move(controlsHintKeyboard));
 
 	auto controlsHintGamepad = std::make_unique<dae::GameObject>("Controls Hint Gamepad");
-	controlsHintGamepad->AddComponent<dae::TextComponent>("SnoBee : A +10 points | B +100 points | X lose life", fpsFont, SDL_Color{210, 220, 235, 255});
-	controlsHintGamepad->SetPosition(20, 548);
+	controlsHintGamepad->AddComponent<dae::TextComponent>("SnoBee : X lose life for sound", fpsFont, SDL_Color{210, 220, 235, 255});
+	controlsHintGamepad->SetPosition(20, 228);
 	controlsHintGamepad->SetParent(canvasPtr, false);
 	scene.Add(std::move(controlsHintGamepad));
 }
@@ -137,6 +151,15 @@ int main(int, char*[]) {
 		data_location = "../Data/";
 #endif
 	dae::Minigin engine(data_location);
+
+	// Audio Service Locator Setup
+	auto sdl_ss = std::make_unique<dae::SDLSoundSystem>(data_location.string());
+	dae::ServiceLocator::register_sound_system(std::make_unique<dae::LoggingSoundSystem>(std::move(sdl_ss)));
+
+	// The startup sound is now handled by the MazeDrawingComponent
+	// dae::ServiceLocator::get_sound_system().play_music((data_location / "Sounds/Start.mp3").string(), 0.3f, false);
+	// dae::ServiceLocator::get_sound_system().play(0, 0.5f);
+
 	engine.Run(load);
 	return 0;
 }

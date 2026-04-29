@@ -1,12 +1,14 @@
 #include "ImGuiManager.h"
 #include "Component.h"
-#include "Achievements.h"
 #include "GameTime.h"
 #include "GameObject.h"
 #include "InputManager.h"
 #include "Scene.h"
 #include "SceneManager.h"
 #include "Subject.h"
+#include "AudioLogger.h"
+#include "ServiceLocator.h"
+#include "SoundSystem.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -232,13 +234,27 @@ void dae::ImGuiManager::RenderEngineTabs()
         ImGui::EndTabItem();
     }
 
-    if (ImGui::BeginTabItem("Achievements"))
+    if (ImGui::BeginTabItem("Audio"))
     {
-        RenderAchievements();
+        RenderAudioLog();
         ImGui::EndTabItem();
     }
 
+    for (const auto& tab : m_customTabs)
+    {
+        if (ImGui::BeginTabItem(tab.first.c_str()))
+        {
+            tab.second();
+            ImGui::EndTabItem();
+        }
+    }
+
     ImGui::EndTabBar();
+}
+
+void dae::ImGuiManager::AddCustomTab(const std::string& name, std::function<void()> renderFunc)
+{
+    m_customTabs.emplace_back(name, std::move(renderFunc));
 }
 
 void dae::ImGuiManager::RenderReopenButton()
@@ -596,58 +612,60 @@ void dae::ImGuiManager::RenderEventMonitor() const
     }
 }
 
-void dae::ImGuiManager::RenderAchievements()
+void dae::ImGuiManager::RenderAudioLog() const
 {
-    Achievements *achievements = Achievements::GetActiveInstance();
-    const bool hasInstance = achievements != nullptr;
-    const bool steamReady = hasInstance && achievements->IsSteamAvailable();
-    const std::uint32_t currentAppId = hasInstance ? achievements->GetCurrentAppId() : 0;
-    const bool isSpacewarApp = hasInstance && achievements->IsSpacewarAppIdActive();
-    const bool canClearSpacewar = steamReady && isSpacewarApp;
-
-    ImGui::Text("Achievements system: %s", hasInstance ? "active" : "not created");
-    ImGui::Text("Steam integration: %s", steamReady ? "ready" : "unavailable");
-    ImGui::Text("Current AppID: %u", currentAppId);
-    ImGui::Text("Spacewar safety gate: %s", isSpacewarApp ? "AppID 480 confirmed" : "blocked (AppID must be 480)");
+    ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), "Audio System Settings");
     ImGui::Separator();
 
-    ImGui::TextWrapped("This action only targets achievements and only when running Spacewar (AppID 480). Non-480 apps are blocked.");
-    ImGui::Checkbox("I confirm clearing Spacewar (480) achievements only", &m_confirmResetAllStats);
+    auto& ss = ServiceLocator::get_sound_system();
+    auto devices = ss.get_audio_devices();
+    int currentDevice = ss.get_current_device_index();
 
-    if (!canClearSpacewar)
+    if (!devices.empty())
     {
-        ImGui::BeginDisabled();
-    }
-
-    if (ImGui::Button("Clear Spacewar (480) Achievements", ImVec2(-1.0f, 34.0f)))
-    {
-        if (m_confirmResetAllStats && canClearSpacewar)
+        std::string currentDeviceName = (currentDevice >= 0 && currentDevice < (int)devices.size()) ? devices[currentDevice] : "Unknown";
+        if (ImGui::BeginCombo("Audio Device", currentDeviceName.c_str()))
         {
-            const bool wasReset = achievements->ClearSpacewarAchievementsOnly();
-            m_achievementActionFeedback = wasReset ? "Spacewar achievements clear request sent successfully." : "Could not clear achievements. Make sure Steam is running and current app id is 480.";
-            if (wasReset)
+            for (int i = 0; i < (int)devices.size(); ++i)
             {
-                m_confirmResetAllStats = false;
+                const bool isSelected = (currentDevice == i);
+                if (ImGui::Selectable(devices[i].c_str(), isSelected))
+                {
+                    ss.set_audio_device(i);
+                }
+                if (isSelected)
+                {
+                    ImGui::SetItemDefaultFocus();
+                }
             }
+            ImGui::EndCombo();
         }
-        else if (!m_confirmResetAllStats)
-        {
-            m_achievementActionFeedback = "Enable the confirmation checkbox first.";
-        }
-        else if (!isSpacewarApp)
-        {
-            m_achievementActionFeedback = "Blocked. Active AppID is not 480, so only Spacewar-safe reset is allowed.";
-        }
+    }
+    else
+    {
+        ImGui::Text("No audio devices found or not supported by current system.");
     }
 
-    if (!canClearSpacewar)
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), "Audio System Log");
+    ImGui::Separator();
+
+    if (ImGui::Button("Clear Log"))
     {
-        ImGui::EndDisabled();
+        AudioLogger::Clear();
     }
 
-    if (!m_achievementActionFeedback.empty())
+    ImGui::BeginChild("AudioLogScroll", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
+    auto logs = AudioLogger::GetLogs();
+    for (const auto& log : logs)
     {
-        ImGui::Spacing();
-        ImGui::TextWrapped("%s", m_achievementActionFeedback.c_str());
+        ImGui::TextUnformatted(log.c_str());
     }
+    if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+    {
+        ImGui::SetScrollHereY(1.0f);
+    }
+    ImGui::EndChild();
 }
+

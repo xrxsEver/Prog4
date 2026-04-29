@@ -126,7 +126,6 @@ void dae::Minigin::RunFrame(const float deltaTime)
 		m_fixedLag -= fixedTimeStep;
 	}
 
-	m_achievements.Update();
 	m_sceneManager.Update(deltaTime);
 
 	auto &renderer = Renderer::GetInstance();

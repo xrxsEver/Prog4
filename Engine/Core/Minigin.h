@@ -4,7 +4,6 @@
 #include <filesystem>
 #include <memory>
 
-#include "Achievements.h"
 #include "InputManager.h"
 #include "ResourceManager.h"
 #include "SceneManager.h"
@@ -14,7 +13,6 @@ namespace dae
 	class Minigin final
 	{
 		bool m_quit{};
-		Achievements m_achievements{};
 		InputManager m_inputManager{};
 		SceneManager m_sceneManager{};
 		ResourceManager m_resourceManager{};
