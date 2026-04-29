@@ -63,18 +63,26 @@ class dae::Minigin::SdlRuntime final
 public:
 	SdlRuntime()
 	{
-		if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
+		if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO))
 		{
 			SDL_Log("SDL init error: %s", SDL_GetError());
 			throw std::runtime_error(std::string("SDL_Init Error: ") + SDL_GetError());
 		}
 
 		m_isInitialized = true;
+
+#ifdef __EMSCRIPTEN__
+		// Emscripten: SDL uses the canvas from HTML, no need to specify dimensions
+		m_window.reset(SDL_CreateWindow(
+			"Programming 4 assignment",
+			0, 0, 0));
+#else
 		m_window.reset(SDL_CreateWindow(
 			"Programming 4 assignment",
 			1024,
 			576,
 			SDL_WINDOW_OPENGL));
+#endif
 
 		if (m_window == nullptr)
 		{

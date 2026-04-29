@@ -41,16 +41,16 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 
 	// background
 	auto go = std::make_unique<dae::GameObject>();
-	go->SetName("Background");
-	go->AddComponent<dae::RenderComponent>(resourceManager)->SetTexture("background.png");
-	go->SetParent(canvasPtr, false);
-	scene.Add(std::move(go));
+	// go->SetName("Background");
+	// go->AddComponent<dae::RenderComponent>(resourceManager)->SetTexture("background.png");
+	// go->SetParent(canvasPtr, false);
+	// scene.Add(std::move(go));
 
 	// logo
 	go = std::make_unique<dae::GameObject>();
 	go->SetName("Logo");
 	go->AddComponent<dae::RenderComponent>(resourceManager)->SetTexture("logo.png");
-	go->SetPosition(10, 288);
+	go->SetPosition(-5, 438);
 	go->SetParent(canvasPtr, false);
 	scene.Add(std::move(go));
 
@@ -64,7 +64,7 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	// scene.Add(std::move(go));
 
 	// fps counter
-	auto fpsFont = resourceManager.LoadFont("Lingua.otf", 22);
+	auto fpsFont = resourceManager.LoadFont("Lingua.otf", 16);
 	go = std::make_unique<dae::GameObject>();
 	go->SetName("FPS Counter");
 	go->AddComponent<dae::TextComponent>("0 FPS", fpsFont, SDL_Color{255, 255, 255, 255});

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.26)
+cmake_minimum_required(VERSION 3.25)
 project(Minigin)
 
 if(EMSCRIPTEN)
@@ -13,75 +13,9 @@ else()
   set(TARGET_PARAM WIN32)
 endif()
 
-set(ENGINE_SOURCES
-  Engine/Core/Component.cpp
-  Engine/Core/GameObject.cpp
-  Engine/Core/Minigin.cpp
-  Engine/Input/Gamepad.cpp
-  Engine/Input/InputManager.cpp
-  Engine/Rendering/Font.cpp
-  Engine/Rendering/RenderComponent.cpp
-  Engine/Rendering/Renderer.cpp
-  Engine/Rendering/ResourceManager.cpp
-  Engine/Rendering/TextComponent.cpp
-  Engine/Rendering/Texture2D.cpp
-  Engine/Scene/Scene.cpp
-  Engine/Scene/SceneManager.cpp
-  Engine/UI/CacheBenchmarkWindow.cpp
-  Engine/UI/ImGuiManager.cpp
-  Engine/Events/Subject.cpp
-  Engine/Audio/ServiceLocator.cpp
-  Engine/Audio/SDLSoundSystem.cpp
-  Engine/Audio/LoggingSoundSystem.cpp
-  Engine/Audio/AudioLogger.cpp
-)
-
-set(GAME_SOURCES
-  Game/App/Main.cpp
-  Game/Systems/Achievements.cpp
-  Game/Systems/MazeGenerator.cpp
-  Game/Commands/AddScoreCommand.cpp
-  Game/Commands/LoseLifeCommand.cpp
-  Game/Commands/MoveCommand.cpp
-  Game/Characters/Character.cpp
-  Game/Characters/PengoCharacter.cpp
-  Game/Characters/SnoBeeCharacter.cpp
-  Game/Components/AnalogStickMoveComponent.cpp
-  Game/Components/FPSComponent.cpp
-  Game/Components/RemainingLivesDisplayComponent.cpp
-  Game/Components/RotationComponent.cpp
-  Game/Components/ScoreDisplayComponent.cpp
-  Game/Components/MazeDrawingComponent.cpp
-)
-
-set(ENGINE_INCLUDE_DIRS
-  ${CMAKE_SOURCE_DIR}/Engine/Core
-  ${CMAKE_SOURCE_DIR}/Engine/Input
-  ${CMAKE_SOURCE_DIR}/Engine/Rendering
-  ${CMAKE_SOURCE_DIR}/Engine/Scene
-  ${CMAKE_SOURCE_DIR}/Engine/UI
-  ${CMAKE_SOURCE_DIR}/Engine/Events
-  ${CMAKE_SOURCE_DIR}/Engine/Audio
-)
-
-set(GAME_INCLUDE_DIRS
-  ${CMAKE_SOURCE_DIR}/Game/App
-  ${CMAKE_SOURCE_DIR}/Game/Systems
-  ${CMAKE_SOURCE_DIR}/Game/Characters
-  ${CMAKE_SOURCE_DIR}/Game/Commands
-  ${CMAKE_SOURCE_DIR}/Game/Components
-)
-
-# list source files here
-add_executable(${TARGET_NAME} ${TARGET_PARAM}
-  ${ENGINE_SOURCES}
-  ${GAME_SOURCES}
-)
-
-# enable c++20 features
-target_compile_features(${TARGET_NAME} PUBLIC cxx_std_20)
-
+# Build dependencies first
 include(FetchContent)
+
 # add glm
 find_package(glm CONFIG QUIET)
 if(NOT glm_FOUND)
@@ -198,7 +132,6 @@ add_library(imgui STATIC
 
 target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${sdl3_SOURCE_DIR}/include)
 target_link_libraries(imgui PUBLIC SDL3::SDL3)
-# enable c++20 features
 target_compile_features(imgui PUBLIC cxx_std_20)
 
 if (WIN32)
@@ -210,25 +143,59 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/steam")
 find_package(Steamworks QUIET)
 
-target_include_directories("${TARGET_NAME}" PUBLIC
-  ${ENGINE_INCLUDE_DIRS}
-  ${GAME_INCLUDE_DIRS}
-  ${glm_SOURCE_DIR}
-  ${sdl3_SOURCE_DIR}/include
-  ${sdl3_ttf_SOURCE_DIR}/include
-  ${sdl3_mixer_SOURCE_DIR}/include
-  ${imgui_SOURCE_DIR}
-  ${VLD_INCLUDE_DIR}
+# Build the Engine library
+add_subdirectory(Engine)
+
+# Game sources
+set(GAME_SOURCES
+  Game/App/Main.cpp
+  Game/Systems/Achievements.cpp
+  Game/Systems/MazeGenerator.cpp
+  Game/Commands/AddScoreCommand.cpp
+  Game/Commands/LoseLifeCommand.cpp
+  Game/Commands/MoveCommand.cpp
+  Game/Characters/Character.cpp
+  Game/Characters/PengoCharacter.cpp
+  Game/Characters/SnoBeeCharacter.cpp
+  Game/Components/AnalogStickMoveComponent.cpp
+  Game/Components/FPSComponent.cpp
+  Game/Components/RemainingLivesDisplayComponent.cpp
+  Game/Components/RotationComponent.cpp
+  Game/Components/ScoreDisplayComponent.cpp
+  Game/Components/MazeDrawingComponent.cpp
 )
 
-target_link_libraries("${TARGET_NAME}" PUBLIC
-  SDL3::SDL3
-  SDL3_ttf::SDL3_ttf
-  SDL3_mixer::SDL3_mixer
-  glm::glm
-  imgui
-  ${VLD_LIBRARIES}
+set(GAME_INCLUDE_DIRS
+  ${CMAKE_SOURCE_DIR}/Game/App
+  ${CMAKE_SOURCE_DIR}/Game/Systems
+  ${CMAKE_SOURCE_DIR}/Game/Characters
+  ${CMAKE_SOURCE_DIR}/Game/Commands
+  ${CMAKE_SOURCE_DIR}/Game/Components
 )
+
+# Create the game executable
+add_executable(${TARGET_NAME} ${TARGET_PARAM}
+  ${GAME_SOURCES}
+)
+
+# enable c++20 features
+target_compile_features(${TARGET_NAME} PUBLIC cxx_std_20)
+
+# Include directories for game
+target_include_directories("${TARGET_NAME}" PUBLIC
+  ${GAME_INCLUDE_DIRS}
+)
+
+# Link against engine library and external dependencies
+target_link_libraries("${TARGET_NAME}" PUBLIC
+  minigin_engine
+)
+
+# Add Steamworks support if available
+if(Steamworks_FOUND)
+  target_link_libraries("${TARGET_NAME}" PUBLIC Steamworks::Steamworks)
+  target_compile_definitions(${TARGET_NAME} PRIVATE USE_STEAMWORKS)
+endif()
 
 if(WIN32 AND NOT EMSCRIPTEN)
   target_link_libraries("${TARGET_NAME}" PRIVATE xinput)
