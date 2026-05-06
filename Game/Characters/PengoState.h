@@ -34,7 +34,6 @@ namespace dae
 
     private:
         float m_animationTimer{0.0f};
-        float m_stateTimer{0.0f};
         int m_currentFrame{0};
     };
 
