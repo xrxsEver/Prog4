@@ -17,6 +17,7 @@ permissions:
 jobs:
   build-web:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,7 +37,7 @@ jobs:
         run: |
           emcc --version
           cmake --version
-
+          
       - name: Configure (CMake)
         run: |
           mkdir -p build-web
@@ -45,28 +46,24 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DSDL_TEST=OFF \
             ..
-
+            
       - name: Build
         run: |
           cd build-web
           cmake --build . --config Release
-
+          
       - name: Prepare Artifact
         run: |
           mkdir -p dist
-          
-          # 1. Copy all Emscripten generated files (.js, .wasm, .data, .html)
+          # Copy all generated files, including .data file!
           cp build-web/minigin_web.* dist/
           
-          # 2. Copy EVERYTHING from your custom web folder (CSS, icons, etc.), not just HTML
-          if [ -d "web" ]; then cp -r web/* dist/; fi
+          # Use Emscripten's generated HTML as the main index file. 
+          # Using a custom minimal index.html often breaks the module load
+          # process and results in a silent blank screen!
+          mv dist/minigin_web.html dist/index.html
           
-          # 3. Rename the generated minigin_web.html to index.html so GitHub Pages can serve it
-          if [ ! -f "dist/index.html" ] && [ -f "dist/minigin_web.html" ]; then
-            mv dist/minigin_web.html dist/index.html
-          fi
-          
-          # 4. Add .nojekyll to ensure GitHub Pages doesn't block files with underscores
+          # Ensure GitHub Pages doesn't block files starting with underscore
           touch dist/.nojekyll
 
       - name: Upload Pages Artifact
