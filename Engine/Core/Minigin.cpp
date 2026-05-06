@@ -86,7 +86,7 @@ public:
 			0, 0, 0));
 #else
 		m_window.reset(SDL_CreateWindow(
-			"Programming 4 assignment",
+			"Pengo",
 			1024,
 			576,
 			SDL_WINDOW_OPENGL));

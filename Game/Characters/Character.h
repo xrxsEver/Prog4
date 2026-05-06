@@ -3,6 +3,7 @@
 #include <string>
 #include "GameObject.h"
 #include "Subject.h"
+#include "RenderComponent.h" // Include RenderComponent header
 
 namespace dae
 {
@@ -19,8 +20,13 @@ namespace dae
         int health{m_startHealth};
         int score{0};
 
+        // Public methods to configure the sprite
+        void SetSpriteTexture(std::string_view filename);
+        void SetSpriteSourceRect(float x, float y, float w, float h);
+        void SetSpriteRenderSize(float w, float h);
+
     protected:
-        void InitializeSprite(float sourceX, float sourceY);
+        void InitializeSprite(float sourceX, float sourceY); // This method will now configure the m_pRenderComponent
 
     private:
         static constexpr float m_spriteSize{16.0f};
@@ -29,5 +35,6 @@ namespace dae
 
     protected:
         ResourceManager &m_resourceManager;
+        RenderComponent* m_pRenderComponent; // Cached pointer to the RenderComponent
     };
 }

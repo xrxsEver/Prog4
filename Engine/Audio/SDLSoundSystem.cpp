@@ -12,6 +12,12 @@
 #include <iostream>
 #include <filesystem>
 
+// For Emscripten, we can't use std::thread without special build flags.
+// So, we'll process audio commands synchronously on the main thread.
+#ifdef __EMSCRIPTEN__
+#define NO_THREADING
+#endif
+
 namespace dae
 {
     namespace fs = std::filesystem;
@@ -64,16 +70,19 @@ namespace dae
             // Default to SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK
             InitMixer(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK);
 
+#ifndef NO_THREADING
             _thread = std::thread(&SDLSoundSystemImpl::ProcessQueue, this);
+#endif
         }
 
         ~SDLSoundSystemImpl()
         {
+#ifndef NO_THREADING
             _stopThread = true;
             _cv.notify_all();
             if (_thread.joinable())
                 _thread.join();
-
+#endif
             CleanupMixer();
             MIX_Quit();
             SDL_QuitSubSystem(SDL_INIT_AUDIO);
@@ -81,14 +90,20 @@ namespace dae
 
         void AddCommand(AudioCommand&& cmd)
         {
+#ifdef NO_THREADING
+            ExecuteCommand(cmd);
+#else
             std::lock_guard<std::mutex> lock(_mutex);
             _queue.push(std::move(cmd));
             _cv.notify_one();
+#endif
         }
 
         std::vector<std::string> GetAudioDevices()
         {
+#ifndef NO_THREADING
             std::lock_guard<std::mutex> lock(_mutex);
+#endif
             RefreshDevices();
             return _devices;
         }
@@ -181,6 +196,7 @@ namespace dae
         }
 
     private:
+#ifndef NO_THREADING
         void ProcessQueue()
         {
             while (!_stopThread)
@@ -207,6 +223,7 @@ namespace dae
                 ExecuteCommand(cmd);
             }
         }
+#endif
 
         void ExecuteCommand(const AudioCommand& cmd)
         {
@@ -241,7 +258,9 @@ namespace dae
 
         void ChangeDevice(int index)
         {
+#ifndef NO_THREADING
             std::lock_guard<std::mutex> lock(_mutex);
+#endif
             if (index < 0 || index >= (int)_deviceIDs.size())
                 return;
 
@@ -413,12 +432,14 @@ namespace dae
             return audio;
         }
 
+#ifndef NO_THREADING
         std::thread _thread;
         std::mutex _mutex;
         std::condition_variable _cv;
         std::queue<AudioCommand> _queue;
         std::atomic<bool> _stopThread{false};
-        
+#endif
+
         MIX_Mixer* _mixer = nullptr;
         std::vector<MIX_Track*> _sfxTracks;
         MIX_Track* _musicTrack = nullptr;

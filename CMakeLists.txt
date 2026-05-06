@@ -156,6 +156,7 @@ set(GAME_SOURCES
   Game/Commands/MoveCommand.cpp
   Game/Characters/Character.cpp
   Game/Characters/PengoCharacter.cpp
+  Game/Characters/PengoState.cpp
   Game/Characters/SnoBeeCharacter.cpp
   Game/Components/AnalogStickMoveComponent.cpp
   Game/Components/FPSComponent.cpp

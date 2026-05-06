@@ -1,171 +1,188 @@
 #include "PengoCharacter.h"
-
-#include <cmath>
-#include <memory>
-#include <glm/vec2.hpp>
-#include <glm/vec3.hpp>
-
 #include "InputManager.h"
-#include "AddScoreCommand.h"
-#include "Component.h"
+#include "ResourceManager.h"
+#include "RenderComponent.h"
 #include "GameTime.h"
-#include "LoseLifeCommand.h"
-#include "MoveCommand.h"
-#include "State.h"
+#include "PengoInputCommands.h" // Use the new input commands
+#include <cmath>
+#include <iostream>
+#include <algorithm>
 
-namespace
+namespace dae
 {
-    constexpr float g_MoveSpeed{200.0f};
-    constexpr float g_MovementEpsilon{0.001f};
+    constexpr float PENGUIN_MOVE_SPEED = 100.f;
+    constexpr float MOVEMENT_EPSILON = 0.001f;
+    constexpr float SPRITE_SIZE = 16.0f;
 
-    class PengoIdleState final : public dae::State
+    // Component to bridge GameObject::Update to PengoCharacter's State Machine
+    class PengoUpdateComponent final : public Component
     {
     public:
-        void OnEnter() override {}
-        void OnExit() override {}
-        void Update(dae::GameObject &actor, const float dt) override
+        explicit PengoUpdateComponent(GameObject* owner) : Component(owner) {}
+
+        void Update(float /*deltaTime*/) override
         {
-            (void)actor;
-            (void)dt;
+            if (auto* pengo = dynamic_cast<PengoCharacter*>(GetOwner()))
+            {
+                pengo->UpdateStateMachine();
+            }
         }
     };
 
-    class PengoWalkingState final : public dae::State
+    PengoCharacter::PengoCharacter(ResourceManager& resourceManager)
+        : Character("Pengo", resourceManager),
+          m_pCurrentState(new IdleState()),
+          m_pNextState(nullptr),
+          m_previousPosition(GetLocalPosition()),
+          m_pRenderComponent(nullptr)
     {
-    public:
-        void OnEnter() override {}
-        void OnExit() override {}
-        void Update(dae::GameObject &actor, const float dt) override
-        {
-            (void)actor;
-            (void)dt;
-        }
-    };
+        InitializeSprite(0.f, 0.f);
 
-    class PengoDyingState final : public dae::State
-    {
-    public:
-        void OnEnter() override {}
-        void OnExit() override {}
-        void Update(dae::GameObject &actor, const float dt) override
-        {
-            (void)actor;
-            (void)dt;
-        }
-    };
+        m_pRenderComponent = GetComponent<RenderComponent>();
 
-    std::unique_ptr<dae::State> CreatePengoState(const dae::PengoState state)
-    {
-        switch (state)
+        if (m_pRenderComponent)
         {
-        case dae::PengoState::Idle:
-            return std::make_unique<PengoIdleState>();
-        case dae::PengoState::Walking:
-            return std::make_unique<PengoWalkingState>();
-        case dae::PengoState::Dying:
-            return std::make_unique<PengoDyingState>();
-        default:
-            return std::make_unique<PengoIdleState>();
+            SetAnimationFrame(0);
+        }
+
+        // Add the bridge component so the state machine updates during GameObject::Update
+        AddComponent<PengoUpdateComponent>();
+
+        m_pCurrentState->OnEnter(this);
+    }
+
+    PengoCharacter::~PengoCharacter()
+    {
+        delete m_pCurrentState;
+        m_pCurrentState = nullptr;
+        delete m_pNextState;
+        m_pNextState = nullptr;
+    }
+
+    void PengoCharacter::UpdateStateMachine()
+    {
+        // 1. Process movement based on the active inputs stack
+        ProcessMovement();
+
+        // 2. Let states transition
+        if (!m_pNextState)
+        {
+            m_pNextState = m_pCurrentState->Update(this);
+        }
+
+        ApplyStateSwap();
+
+        // 3. Update position history for HasMoved() check
+        m_previousPosition = GetLocalPosition();
+    }
+
+    void PengoCharacter::ProcessMovement()
+    {
+        // If there are no keys held down, we don't move.
+        if (m_activeMoveInputs.empty())
+        {
+            return;
+        }
+
+        // Latest Key Priority: The last key pressed is at the back of the vector.
+        PengoDirection activeDirection = m_activeMoveInputs.back();
+
+        // Set the facing direction for animations
+        SetDirection(activeDirection);
+
+        // Apply Movement
+        const float dt = GameTime::GetInstance().GetDeltaTime();
+        glm::vec3 movement{0.0f, 0.0f, 0.0f};
+
+        switch (activeDirection)
+        {
+            case PengoDirection::Up:    movement.y = -PENGUIN_MOVE_SPEED * dt; break;
+            case PengoDirection::Down:  movement.y = PENGUIN_MOVE_SPEED * dt; break;
+            case PengoDirection::Left:  movement.x = -PENGUIN_MOVE_SPEED * dt; break;
+            case PengoDirection::Right: movement.x = PENGUIN_MOVE_SPEED * dt; break;
+        }
+
+        SetLocalPosition(GetLocalPosition() + movement);
+    }
+
+    void PengoCharacter::ApplyStateSwap()
+    {
+        if (m_pNextState != nullptr)
+        {
+            m_pCurrentState->OnExit(this);
+            delete m_pCurrentState;
+            m_pCurrentState = m_pNextState;
+            m_pNextState = nullptr;
+            m_pCurrentState->OnEnter(this);
         }
     }
 
-    class PengoStateMachineComponent final : public dae::Component
+    void PengoCharacter::BindKeyboardControls(InputManager& inputManager)
     {
-    public:
-        explicit PengoStateMachineComponent(dae::GameObject *owner)
-            : Component(owner), m_previousPosition(owner != nullptr ? owner->GetLocalPosition() : glm::vec3{})
+        // Key Down - Start tracking input
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Down, std::make_unique<MoveInputStartCommand>(*this, PengoDirection::Up));
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Down, std::make_unique<MoveInputStartCommand>(*this, PengoDirection::Down));
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Down, std::make_unique<MoveInputStartCommand>(*this, PengoDirection::Left));
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Down, std::make_unique<MoveInputStartCommand>(*this, PengoDirection::Right));
+
+        // Key Up - Stop tracking input
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Up, std::make_unique<MoveInputStopCommand>(*this, PengoDirection::Up));
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Up, std::make_unique<MoveInputStopCommand>(*this, PengoDirection::Down));
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Up, std::make_unique<MoveInputStopCommand>(*this, PengoDirection::Left));
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Up, std::make_unique<MoveInputStopCommand>(*this, PengoDirection::Right));
+    }
+
+    void PengoCharacter::AddMoveInput(PengoDirection direction)
+    {
+        // Avoid adding duplicates if the OS sends repeat keydown events
+        if (std::find(m_activeMoveInputs.begin(), m_activeMoveInputs.end(), direction) == m_activeMoveInputs.end())
         {
-            ChangeState(dae::PengoState::Idle);
+            m_activeMoveInputs.push_back(direction);
         }
+    }
 
-        void Update(float deltaTime) override
+    void PengoCharacter::RemoveMoveInput(PengoDirection direction)
+    {
+        m_activeMoveInputs.erase(
+            std::remove(m_activeMoveInputs.begin(), m_activeMoveInputs.end(), direction),
+            m_activeMoveInputs.end()
+        );
+    }
+
+    bool PengoCharacter::HasMoved() const
+    {
+        const glm::vec3 delta = GetLocalPosition() - m_previousPosition;
+        return std::fabs(delta.x) > MOVEMENT_EPSILON || std::fabs(delta.y) > MOVEMENT_EPSILON;
+    }
+
+    void PengoCharacter::SetDirection(PengoDirection direction)
+    {
+        m_currentDirection = direction;
+    }
+
+    PengoDirection PengoCharacter::GetDirection() const
+    {
+        return m_currentDirection;
+    }
+
+    void PengoCharacter::SetAnimationFrame(int frameIndex)
+    {
+        if (m_animationFrame == frameIndex)
+            return;
+
+        m_animationFrame = frameIndex;
+        UpdateRenderComponent();
+    }
+
+    void PengoCharacter::UpdateRenderComponent()
+    {
+        if (m_pRenderComponent)
         {
-            auto *owner = GetOwner();
-            if (owner == nullptr)
-            {
-                return;
-            }
-
-            const auto *character = dynamic_cast<const dae::Character *>(owner);
-            if (character == nullptr)
-            {
-                return;
-            }
-
-            if (m_pCurrentState)
-            {
-                m_pCurrentState->Update(*owner, deltaTime);
-            }
-
-            const auto nextState = DetermineState(*owner, *character);
-            if (nextState != m_currentState)
-            {
-                ChangeState(nextState);
-            }
-
-            m_previousPosition = owner->GetLocalPosition();
+            m_pRenderComponent->SetSourceRect(
+                static_cast<float>(m_animationFrame) * SPRITE_SIZE,
+                0.0f,
+                SPRITE_SIZE,
+                SPRITE_SIZE);
         }
-
-        const char *GetDebugName() const override { return "Pengo State Machine"; }
-
-    private:
-        static bool HasMoved(const dae::GameObject &owner, const glm::vec3 &previousPosition)
-        {
-            const glm::vec3 delta = owner.GetLocalPosition() - previousPosition;
-            return std::fabs(delta.x) > g_MovementEpsilon || std::fabs(delta.y) > g_MovementEpsilon || std::fabs(delta.z) > g_MovementEpsilon;
-        }
-
-        dae::PengoState DetermineState(const dae::GameObject &owner, const dae::Character &character) const
-        {
-            if (character.health <= 0)
-            {
-                return dae::PengoState::Dying;
-            }
-
-            if (HasMoved(owner, m_previousPosition))
-            {
-                return dae::PengoState::Walking;
-            }
-
-            return dae::PengoState::Idle;
-        }
-
-        void ChangeState(const dae::PengoState nextState)
-        {
-            if (m_pCurrentState)
-            {
-                m_pCurrentState->OnExit();
-            }
-
-            m_pCurrentState = CreatePengoState(nextState);
-            m_currentState = nextState;
-
-            if (m_pCurrentState)
-            {
-                m_pCurrentState->OnEnter();
-            }
-        }
-
-        std::unique_ptr<dae::State> m_pCurrentState{};
-        dae::PengoState m_currentState{dae::PengoState::Idle};
-        glm::vec3 m_previousPosition{};
-    };
-}
-
-dae::PengoCharacter::PengoCharacter(ResourceManager &resourceManager)
-    : Character("Pengo", resourceManager)
-{
-    InitializeSprite(0.0f, 0.0f);
-    AddComponent<PengoStateMachineComponent>();
-}
-
-void dae::PengoCharacter::BindKeyboardControls(InputManager &inputManager)
-{
-    inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0.0f, -1.0f}, g_MoveSpeed));
-    inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0.0f, 1.0f}, g_MoveSpeed));
-    inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{-1.0f, 0.0f}, g_MoveSpeed));
-    inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{1.0f, 0.0f}, g_MoveSpeed));
-    inputManager.BindKeyboardCommand(SDL_SCANCODE_C, KeyState::Down, std::make_unique<LoseLifeCommand>(*this));
-    inputManager.BindKeyboardCommand(SDL_SCANCODE_X, KeyState::Down, std::make_unique<AddScoreCommand>(*this, 10));
-    inputManager.BindKeyboardCommand(SDL_SCANCODE_V, KeyState::Down, std::make_unique<AddScoreCommand>(*this, 100));
+    }
 }
