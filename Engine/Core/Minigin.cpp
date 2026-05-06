@@ -80,10 +80,12 @@ public:
 		m_isInitialized = true;
 
 #ifdef __EMSCRIPTEN__
-		// Emscripten: SDL uses the canvas from HTML, no need to specify dimensions
+		// Passing actual window dimensions instead of 0,0 ensures SDL3 forces the HTML canvas to this size.
 		m_window.reset(SDL_CreateWindow(
-			"Programming 4 assignment",
-			0, 0, 0));
+			"Pengo",
+			1024,
+			576,
+			0));
 #else
 		m_window.reset(SDL_CreateWindow(
 			"Pengo",
