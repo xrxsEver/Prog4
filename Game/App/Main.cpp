@@ -51,7 +51,7 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	go = std::make_unique<dae::GameObject>();
 	go->SetName("Logo");
 	go->AddComponent<dae::RenderComponent>(resourceManager)->SetTexture("logo.png");
-	go->SetPosition(470, 438);
+	go->SetPosition(470, 428);
 	go->SetParent(canvasPtr, false);
 	scene.Add(std::move(go));
 

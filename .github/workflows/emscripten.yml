@@ -55,13 +55,11 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p dist
-          # Copy all generated files, including .data file!
+          # Copy the generated .js, .wasm, and .data files
           cp build-web/minigin_web.* dist/
           
-          # Use Emscripten's generated HTML as the main index file. 
-          # Using a custom minimal index.html often breaks the module load
-          # process and results in a silent blank screen!
-          mv dist/minigin_web.html dist/index.html
+          # Copy your custom web folder containing your clean index.html shell
+          if [ -d "web" ]; then cp -r web/* dist/; fi
           
           # Ensure GitHub Pages doesn't block files starting with underscore
           touch dist/.nojekyll

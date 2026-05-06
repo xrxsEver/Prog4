@@ -226,8 +226,8 @@ if(EMSCRIPTEN)
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/web" "$<TARGET_FILE_DIR:${TARGET_NAME}>/"
   )
 
-  # Have emscripten generate a html page too.
-  set(CMAKE_EXECUTABLE_SUFFIX ".html")
+  # Emscripten will generate JS, WASM, and DATA instead of wrapping it in its default HTML terminal template
+  set(CMAKE_EXECUTABLE_SUFFIX ".js")
 
 elseif(WIN32)
   # Set minigin as the default startup project
