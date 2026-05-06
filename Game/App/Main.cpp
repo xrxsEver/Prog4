@@ -156,17 +156,9 @@ int main(int, char *[])
 	dae::Minigin engine(data_location);
 
 	// Audio Service Locator Setup
-#ifdef __EMSCRIPTEN__
-	// Emscripten doesn't support SDL audio device enumeration, use null system
-	dae::ServiceLocator::register_sound_system(std::make_unique<dae::NullSoundSystem>());
-#else
+	// Use SDLSoundSystem for ALL platforms! We previously made it synchronous for Emscripten to avoid thread issues.
 	auto sdl_ss = std::make_unique<dae::SDLSoundSystem>(data_location.string());
 	dae::ServiceLocator::register_sound_system(std::make_unique<dae::LoggingSoundSystem>(std::move(sdl_ss)));
-#endif
-
-	// The startup sound is now handled by the MazeDrawingComponent
-	// dae::ServiceLocator::get_sound_system().play_music((data_location / "Sounds/Start.mp3").string(), 0.3f, false);
-	// dae::ServiceLocator::get_sound_system().play(0, 0.5f);
 
 	engine.Run(load);
 	return 0;
