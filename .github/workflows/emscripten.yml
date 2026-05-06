@@ -17,7 +17,6 @@ permissions:
 jobs:
   build-web:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -55,8 +54,20 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p dist
+          
+          # 1. Copy all Emscripten generated files (.js, .wasm, .data, .html)
           cp build-web/minigin_web.* dist/
-          cp web/*.html dist/
+          
+          # 2. Copy EVERYTHING from your custom web folder (CSS, icons, etc.), not just HTML
+          if [ -d "web" ]; then cp -r web/* dist/; fi
+          
+          # 3. Rename the generated minigin_web.html to index.html so GitHub Pages can serve it
+          if [ ! -f "dist/index.html" ] && [ -f "dist/minigin_web.html" ]; then
+            mv dist/minigin_web.html dist/index.html
+          fi
+          
+          # 4. Add .nojekyll to ensure GitHub Pages doesn't block files with underscores
+          touch dist/.nojekyll
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
