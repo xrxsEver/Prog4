@@ -58,8 +58,10 @@ jobs:
           # Copy the generated .js, .wasm, and .data files
           cp build-web/minigin_web.* dist/
           
-          # Copy your custom web folder containing your clean index.html shell
-          if [ -d "web" ]; then cp -r web/* dist/; fi
+          # Rename the custom shell generated HTML to index.html so GitHub Pages loads it
+          if [ -f "dist/minigin_web.html" ]; then
+            mv dist/minigin_web.html dist/index.html
+          fi
           
           # Ensure GitHub Pages doesn't block files starting with underscore
           touch dist/.nojekyll

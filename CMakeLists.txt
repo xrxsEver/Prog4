@@ -211,7 +211,8 @@ endif()
 
 if(EMSCRIPTEN)
   set(EMSCRIPTEN_COMPILE_FLAGS "${EMSCRIPTEN_LINK_FLAGS} -g")
-  set(EMSCRIPTEN_LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS} -sUSE_FREETYPE=1 -sUSE_HARFBUZZ=1 -g -sALLOW_MEMORY_GROWTH --preload-file \"${CMAKE_SOURCE_DIR}/Data@/\"")
+  # Added --shell-file to force Emscripten to use our clean custom HTML template instead of its default bloated one
+  set(EMSCRIPTEN_LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS} -sUSE_FREETYPE=1 -sUSE_HARFBUZZ=1 -g -sALLOW_MEMORY_GROWTH --preload-file \"${CMAKE_SOURCE_DIR}/Data@/\" --shell-file \"${CMAKE_SOURCE_DIR}/web/index.html\"")
 
   # Use the Emscripten toolchain
   set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmscriptenToolchain.cmake)
@@ -226,8 +227,8 @@ if(EMSCRIPTEN)
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/web" "$<TARGET_FILE_DIR:${TARGET_NAME}>/"
   )
 
-  # Emscripten will generate JS, WASM, and DATA instead of wrapping it in its default HTML terminal template
-  set(CMAKE_EXECUTABLE_SUFFIX ".js")
+  # Revert to .html suffix so Emscripten correctly processes our new shell file
+  set(CMAKE_EXECUTABLE_SUFFIX ".html")
 
 elseif(WIN32)
   # Set minigin as the default startup project
