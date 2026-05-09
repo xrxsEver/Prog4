@@ -78,7 +78,7 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 
 	// Maze Intro - Moved earlier to be in the background
 	auto mazeIntro = std::make_unique<dae::GameObject>("Maze Intro");
-	mazeIntro->AddComponent<dae::MazeDrawingComponent>(resourceManager, []()
+	mazeIntro->AddComponent<dae::MazeDrawingComponent>(scene, resourceManager, []()
 													   {
 														   // Callback when finished
 													   });

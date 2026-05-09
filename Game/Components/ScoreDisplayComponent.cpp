@@ -1,33 +1,17 @@
 #include "ScoreDisplayComponent.h"
 
+#include <numeric>
 #include <string>
-#include <utility>
+#include <imgui.h>
 
 #include "Character.h"
 #include "GameObject.h"
 #include "TextComponent.h"
-#include <imgui.h>
-
-namespace
-{
-    int CalculateTotalScore(const std::vector<dae::Character *> &characters)
-    {
-        int totalScore{};
-        for (const auto *character : characters)
-        {
-            if (character != nullptr)
-            {
-                totalScore += character->score;
-            }
-        }
-        return totalScore;
-    }
-}
 
 dae::ScoreDisplayComponent::ScoreDisplayComponent(GameObject *pOwner, std::vector<Character *> observedCharacters, std::string labelPrefix)
     : Component(pOwner), m_observedCharacters(std::move(observedCharacters)), m_labelPrefix(std::move(labelPrefix))
 {
-    for (auto *character : m_observedCharacters)
+    for (const auto character : m_observedCharacters)
     {
         if (character != nullptr)
         {
@@ -38,7 +22,7 @@ dae::ScoreDisplayComponent::ScoreDisplayComponent(GameObject *pOwner, std::vecto
 
 dae::ScoreDisplayComponent::~ScoreDisplayComponent()
 {
-    for (auto *character : m_observedCharacters)
+    for (const auto character : m_observedCharacters)
     {
         if (character != nullptr)
         {
@@ -61,7 +45,9 @@ void dae::ScoreDisplayComponent::Update(float deltaTime)
         return;
     }
 
-    const int currentScore = CalculateTotalScore(m_observedCharacters);
+    const int currentScore = std::accumulate(m_observedCharacters.begin(), m_observedCharacters.end(), 0, [](const int sum, const Character *character)
+                                             { return sum + (character != nullptr ? character->score : 0); });
+
     if (currentScore != m_cachedScore)
     {
         RefreshText();
@@ -76,10 +62,16 @@ void dae::ScoreDisplayComponent::OnNotify(const GameEvent event)
     }
 }
 
+std::unique_ptr<dae::Component> dae::ScoreDisplayComponent::Clone(GameObject* pOwner) const
+{
+    return std::make_unique<ScoreDisplayComponent>(pOwner, m_observedCharacters, m_labelPrefix);
+}
+
 void dae::ScoreDisplayComponent::DrawInspector() const
 {
-    ImGui::Text("Observed characters: %zu", m_observedCharacters.size());
+    ImGui::Text("Label prefix: %s", m_labelPrefix.c_str());
     ImGui::Text("Cached score: %d", m_cachedScore);
+    ImGui::Text("Observing %zu characters", m_observedCharacters.size());
 }
 
 void dae::ScoreDisplayComponent::RefreshText()
@@ -89,6 +81,8 @@ void dae::ScoreDisplayComponent::RefreshText()
         return;
     }
 
-    m_cachedScore = CalculateTotalScore(m_observedCharacters);
+    m_cachedScore = std::accumulate(m_observedCharacters.begin(), m_observedCharacters.end(), 0, [](const int sum, const Character *character)
+                                    { return sum + (character != nullptr ? character->score : 0); });
+
     m_pTextComponent->SetText(m_labelPrefix + ": " + std::to_string(m_cachedScore));
 }

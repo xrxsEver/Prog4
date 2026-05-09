@@ -15,6 +15,9 @@ namespace dae
         virtual const char *GetDebugName() const { return "Component"; }
         virtual void DrawInspector() const {}
 
+        // Prototype Pattern: Enable cloning components
+        virtual std::unique_ptr<Component> Clone(GameObject* pOwner) const = 0;
+
         virtual ~Component() = default;
 
         Component(const Component &) = delete;

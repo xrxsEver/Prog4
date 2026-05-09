@@ -1,9 +1,7 @@
 #include "RotationComponent.h"
-#include "GameObject.h"
-#include "GameTime.h"
-#include <imgui.h>
 #include <cmath>
-#include <glm/vec3.hpp>
+#include <imgui.h>
+#include "GameObject.h"
 
 dae::RotationComponent::RotationComponent(GameObject *pOwner, float radius, float speed)
     : Component(pOwner), m_radius(radius), m_speed(speed)
@@ -14,16 +12,22 @@ void dae::RotationComponent::Update(float deltaTime)
 {
     m_angle += m_speed * deltaTime;
 
-    const glm::vec3 offset{m_radius * std::cos(m_angle),
-                           m_radius * std::sin(m_angle),
-                           0.f};
+    const float x = std::cos(m_angle) * m_radius;
+    const float y = std::sin(m_angle) * m_radius;
 
-    GetOwner()->SetLocalPosition(offset);
+    GetOwner()->SetLocalPosition({x, y, 0.0f});
+}
+
+std::unique_ptr<dae::Component> dae::RotationComponent::Clone(GameObject* pOwner) const
+{
+    auto clone = std::make_unique<RotationComponent>(pOwner, m_radius, m_speed);
+    clone->m_angle = m_angle;
+    return clone;
 }
 
 void dae::RotationComponent::DrawInspector() const
 {
-    ImGui::Text("Radius: %.2f", m_radius);
-    ImGui::Text("Speed: %.2f", m_speed);
     ImGui::Text("Angle: %.2f", m_angle);
+    ImGui::DragFloat("Radius", const_cast<float *>(&m_radius), 1.0f, 0.0f, 1000.0f);
+    ImGui::DragFloat("Speed", const_cast<float *>(&m_speed), 0.1f, -10.0f, 10.0f);
 }

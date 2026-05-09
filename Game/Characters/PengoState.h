@@ -1,6 +1,8 @@
 #ifndef PENGO_STATE_H
 #define PENGO_STATE_H
 
+#include <memory>
+
 namespace dae
 {
     class PengoCharacter;
@@ -11,8 +13,8 @@ namespace dae
         virtual ~PengoState() = default;
         virtual void OnEnter(PengoCharacter *pPengo) = 0;
         virtual void OnExit(PengoCharacter *pPengo) = 0;
-        virtual PengoState *HandleInput(PengoCharacter *pPengo) = 0;
-        virtual PengoState *Update(PengoCharacter *pPengo) = 0;
+        virtual std::unique_ptr<PengoState> HandleInput(PengoCharacter *pPengo) = 0;
+        virtual std::unique_ptr<PengoState> Update(PengoCharacter *pPengo) = 0;
     };
 
     class IdleState final : public PengoState
@@ -20,8 +22,8 @@ namespace dae
     public:
         void OnEnter(PengoCharacter *pPengo) override;
         void OnExit(PengoCharacter *pPengo) override;
-        PengoState *HandleInput(PengoCharacter *pPengo) override;
-        PengoState *Update(PengoCharacter *pPengo) override;
+        std::unique_ptr<PengoState> HandleInput(PengoCharacter *pPengo) override;
+        std::unique_ptr<PengoState> Update(PengoCharacter *pPengo) override;
     };
 
     class MovingState final : public PengoState
@@ -29,10 +31,11 @@ namespace dae
     public:
         void OnEnter(PengoCharacter *pPengo) override;
         void OnExit(PengoCharacter *pPengo) override;
-        PengoState *HandleInput(PengoCharacter *pPengo) override;
-        PengoState *Update(PengoCharacter *pPengo) override;
+        std::unique_ptr<PengoState> HandleInput(PengoCharacter *pPengo) override;
+        std::unique_ptr<PengoState> Update(PengoCharacter *pPengo) override;
 
     private:
+        void UpdateAnimation(PengoCharacter *pPengo);
         float m_animationTimer{0.0f};
         int m_currentFrame{0};
     };
@@ -42,8 +45,8 @@ namespace dae
     public:
         void OnEnter(PengoCharacter *pPengo) override;
         void OnExit(PengoCharacter *pPengo) override;
-        PengoState *HandleInput(PengoCharacter *pPengo) override;
-        PengoState *Update(PengoCharacter *pPengo) override;
+        std::unique_ptr<PengoState> HandleInput(PengoCharacter *pPengo) override;
+        std::unique_ptr<PengoState> Update(PengoCharacter *pPengo) override;
     };
 
     class DyingState final : public PengoState
@@ -51,8 +54,8 @@ namespace dae
     public:
         void OnEnter(PengoCharacter *pPengo) override;
         void OnExit(PengoCharacter *pPengo) override;
-        PengoState *HandleInput(PengoCharacter *pPengo) override;
-        PengoState *Update(PengoCharacter *pPengo) override;
+        std::unique_ptr<PengoState> HandleInput(PengoCharacter *pPengo) override;
+        std::unique_ptr<PengoState> Update(PengoCharacter *pPengo) override;
     };
 }
 

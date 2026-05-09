@@ -2,15 +2,16 @@
 #define PENGO_CHARACTER_H
 
 #include "Character.h"
-#include "PengoState.h"
 #include <glm/vec3.hpp>
 #include <vector>
+#include <memory>
 
 namespace dae
 {
     class InputManager;
     class ResourceManager;
     class RenderComponent;
+    class PengoState;
 
     // Enum to represent Pengo's facing direction
     enum class PengoDirection
@@ -19,6 +20,16 @@ namespace dae
         Left,
         Up,
         Right
+    };
+
+    enum class PengoInput
+    {
+        None,
+        MoveDown,
+        MoveLeft,
+        MoveUp,
+        MoveRight,
+        Push
     };
 
     class PengoCharacter final : public Character
@@ -43,6 +54,8 @@ namespace dae
         PengoDirection GetDirection() const;
         void SetAnimationFrame(int frameIndex);
 
+        void SetSpriteData(int row, int startCol, bool isMoving);
+
         // --- Latest Key Priority Movement ---
         void AddMoveInput(PengoDirection direction);
         void RemoveMoveInput(PengoDirection direction);
@@ -51,8 +64,7 @@ namespace dae
         void UpdateRenderComponent();
         void ProcessMovement();
 
-        PengoState* m_pCurrentState;
-        PengoState* m_pNextState;
+        std::unique_ptr<PengoState> m_pCurrentState;
         glm::vec3 m_previousPosition{};
 
         RenderComponent* m_pRenderComponent;
@@ -65,6 +77,12 @@ namespace dae
         // Grid movement variables
         glm::vec3 m_targetPosition{};
         bool m_isMovingToTarget{false};
+
+        float m_animationTimer{0.0f};
+        int m_currentFrame{0};
+        int m_spriteRow{0};
+        int m_spriteStartCol{0};
+        bool m_isMoving{false};
 
         static constexpr float m_blockSize = 32.0f;
     };

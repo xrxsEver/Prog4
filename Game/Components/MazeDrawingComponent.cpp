@@ -5,6 +5,8 @@
 #include "GameObject.h"
 #include "ServiceLocator.h"
 #include "MazeGenerator.h"
+#include "Scene.h"
+#include "SnoBeeCharacter.h"
 #include <algorithm>
 #include <random>
 
@@ -12,13 +14,16 @@ namespace dae
 {
     bool MazeDrawingComponent::g_ShowFullMaze = false;
 
-    MazeDrawingComponent::MazeDrawingComponent(GameObject* owner, ResourceManager& resourceManager, std::function<void()> onFinished)
+    MazeDrawingComponent::MazeDrawingComponent(GameObject* owner, Scene& scene, ResourceManager& resourceManager, std::function<void()> onFinished)
         : Component(owner)
+        , m_scene(scene)
         , m_resourceManager(resourceManager)
         , m_onFinished(onFinished)
     {
         m_backgroundTexture = m_resourceManager.LoadTexture("Playfield.png");
         m_iceBlockTexture = m_resourceManager.LoadTexture("iceblock.png");
+        m_miscTexture = m_resourceManager.LoadTexture("misc.png");
+        m_pengoTexture = m_resourceManager.LoadTexture("pengo.png");
 
         // Generate the maze
         MazeGenerator generator;
@@ -36,7 +41,7 @@ namespace dae
             {
                 // All tiles start as ICE (or WALL if border)
                 // In Pengo, the "drawing" reveals the maze paths by removing ice blocks.
-                m_blocks.push_back({ r, c, false, result.grid[r][c] });
+                m_blocks.push_back({ r, c, false, result.grid[r][c], false, 0, 0.0f });
             }
         }
 
@@ -47,14 +52,56 @@ namespace dae
             int index = pos.first * m_cols + pos.second;
             m_removalOrder.push_back(index);
         }
-
-        // Start playing the drawing sound as music so we can stop it
-        ServiceLocator::get_sound_system().play_music("Sounds/Drawing Maze.mp3", 0.6f, true);
     }
 
     void MazeDrawingComponent::Update(float deltaTime)
     {
-        if (m_isFinished) return;
+        if (m_isFinished)
+        {
+            if (m_spawnStep == SpawnStep::None) return;
+
+            m_spawnAnimationTimer += deltaTime;
+            float currentFrameTime = (m_spawnStep == SpawnStep::SnoBeeSpawning) ? SNOBEE_SPAWN_FRAME_TIME : SPAWN_FRAME_TIME;
+
+            if (m_spawnAnimationTimer >= currentFrameTime)
+            {
+                m_spawnAnimationTimer -= currentFrameTime;
+                m_spawnAnimationFrame++;
+
+                if (m_spawnStep == SpawnStep::IceBreaking)
+                {
+                    if (m_spawnAnimationFrame >= 9)
+                    {
+                        m_spawnStep = SpawnStep::SnoBeeSpawning;
+                        m_spawnAnimationFrame = 0;
+                    }
+                }
+                else if (m_spawnStep == SpawnStep::SnoBeeSpawning)
+                {
+                    if (m_spawnAnimationFrame >= 6)
+                    {
+                        m_spawnStep = SpawnStep::Finished;
+                        
+                        // Actually spawn them
+                        for (int index : m_spawnBlockIndices)
+                        {
+                            auto& b = m_blocks[index];
+                            auto snoBee = std::make_unique<SnoBeeCharacter>(m_resourceManager);
+                            glm::vec2 screenPos = GetScreenPos(b.r, b.c);
+                            snoBee->SetLocalPosition({ screenPos.x, screenPos.y, 0 });
+                            m_scene.Add(std::move(snoBee));
+                            
+                            b.removed = true;
+                            b.isSpawning = false;
+                        }
+                        
+                        if (m_onFinished) m_onFinished();
+                        m_spawnStep = SpawnStep::None;
+                    }
+                }
+            }
+            return;
+        }
 
         m_timer += deltaTime;
         if (m_timer >= m_blockRemoveInterval)
@@ -72,7 +119,36 @@ namespace dae
                 // Finished! Stop drawing sound and play start sound
                 ServiceLocator::get_sound_system().stop_music();
                 ServiceLocator::get_sound_system().play_music("Sounds/Start.mp3", 0.5f, false);
-                if (m_onFinished) m_onFinished();
+                
+                // Pick 3 random remaining ice blocks
+                std::vector<int> iceBlockIndices;
+                for (int i = 0; i < (int)m_blocks.size(); ++i)
+                {
+                    if (!m_blocks[i].removed && m_blocks[i].type == TileType::ICE)
+                    {
+                        iceBlockIndices.push_back(i);
+                    }
+                }
+
+                if (iceBlockIndices.size() >= 3)
+                {
+                    std::random_device rd;
+                    std::mt19937 g(rd());
+                    std::shuffle(iceBlockIndices.begin(), iceBlockIndices.end(), g);
+                    
+                    for (int i = 0; i < 3; ++i)
+                    {
+                        m_spawnBlockIndices.push_back(iceBlockIndices[i]);
+                        m_blocks[iceBlockIndices[i]].isSpawning = true;
+                    }
+                    m_spawnStep = SpawnStep::IceBreaking;
+                    m_spawnAnimationFrame = 0;
+                    m_spawnAnimationTimer = 0.0f;
+                }
+                else
+                {
+                    if (m_onFinished) m_onFinished();
+                }
             }
         }
     }
@@ -82,14 +158,14 @@ namespace dae
         auto& renderer = Renderer::GetInstance();
         const auto& worldPos = GetOwner()->GetWorldPosition();
 
-        // 1. Render the background
+        // Render background
         SDL_FRect srcBackground = { 0.0f, 0.0f, 224.0f, 256.0f };
         float scale = m_blockSize / 16.0f;
         float bgWidth = 224.0f * scale;
         float bgHeight = 256.0f * scale;
         renderer.RenderTexture(*m_backgroundTexture, srcBackground, worldPos.x, worldPos.y, bgWidth, bgHeight);
 
-        // 2. Render Grid Tiles (Blocks)
+        // Render Grid Tiles (Blocks)
         // The ice block texture is 16x16
         SDL_FRect srcRect = { 0.0f, 0.0f, 16.0f, 16.0f };
 
@@ -104,8 +180,28 @@ namespace dae
             float dstX = worldPos.x + screenPos.x;
             float dstY = worldPos.y + screenPos.y;
 
-            // Actual Render Call
-            renderer.RenderTexture(*m_iceBlockTexture, srcRect, dstX, dstY, m_blockSize, m_blockSize);
+            if (b.isSpawning)
+            {
+                SDL_FRect animSrc;
+                if (m_spawnStep == SpawnStep::IceBreaking)
+                {
+                    // Ice breaking is likely 9 frames. 
+                    animSrc = { m_spawnAnimationFrame * 16.0f, 48.0f, 16.0f, 16.0f };
+                    renderer.RenderTexture(*m_miscTexture, animSrc, dstX, dstY, m_blockSize, m_blockSize);
+                }
+                else // SnoBeeSpawning
+                {
+                    // SnoBee spawning frames in pengo.png
+                    // they are 6 frames.
+                    animSrc = { (8 + m_spawnAnimationFrame) * 16.0f, 8 * 16.0f, 16.0f, 16.0f };
+                    renderer.RenderTexture(*m_pengoTexture, animSrc, dstX, dstY, m_blockSize, m_blockSize);
+                }
+            }
+            else
+            {
+                // Actual Render Call
+                renderer.RenderTexture(*m_iceBlockTexture, srcRect, dstX, dstY, m_blockSize, m_blockSize);
+            }
         }
     }
 
@@ -113,6 +209,24 @@ namespace dae
     {
         // Simple linear transformation from grid to screen pixels
         // m_offsetX and m_offsetY handle the "pushing down and centering"
-        return { m_offsetX + (float)c * m_blockSize, m_offsetY + (float)r * m_blockSize };
+        float x = m_offsetX + c * m_blockSize;
+        float y = m_offsetY + r * m_blockSize;
+        return { x, y };
+    }
+
+    std::unique_ptr<Component> MazeDrawingComponent::Clone(GameObject* pOwner) const
+    {
+        auto clone = std::make_unique<MazeDrawingComponent>(pOwner, m_scene, m_resourceManager, m_onFinished);
+        clone->m_blocks = m_blocks;
+        clone->m_removalOrder = m_removalOrder;
+        clone->m_isFinished = m_isFinished;
+        clone->m_timer = m_timer;
+        clone->m_removedStep = m_removedStep;
+        clone->m_spawnStep = m_spawnStep;
+        clone->m_spawnBlockIndices = m_spawnBlockIndices;
+        clone->m_spawnAnimationFrame = m_spawnAnimationFrame;
+        clone->m_spawnAnimationTimer = m_spawnAnimationTimer;
+        clone->m_pengoTexture = m_pengoTexture;
+        return clone;
     }
 }

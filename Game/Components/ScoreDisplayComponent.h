@@ -19,15 +19,17 @@ namespace dae
 
         void Update(float deltaTime) override;
         void OnNotify(GameEvent event) override;
-        const char *GetDebugName() const override { return "ScoreDisplay"; }
+
+        const char *GetDebugName() const override { return "Score Display"; }
         void DrawInspector() const override;
+        std::unique_ptr<Component> Clone(GameObject* pOwner) const override;
 
     private:
         void RefreshText();
 
-        std::vector<Character *> m_observedCharacters;
+        std::vector<Character *> m_observedCharacters{};
         TextComponent *m_pTextComponent{};
-        std::string m_labelPrefix;
         int m_cachedScore{-1};
+        std::string m_labelPrefix{};
     };
 }

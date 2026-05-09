@@ -30,6 +30,7 @@ namespace dae
 		friend class SceneManager;
 
 		std::vector<std::unique_ptr<GameObject>> m_objects{};
+		std::vector<std::unique_ptr<GameObject>> m_objectsToAdd{};
 	};
 
 }

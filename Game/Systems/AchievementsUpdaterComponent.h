@@ -9,14 +9,19 @@ namespace dae
     public:
         explicit AchievementsUpdaterComponent(GameObject* owner, Achievements* achievements)
             : Component(owner), m_achievements(achievements) {}
-            
-        virtual void Update(float deltaTime) override
+
+        void Update(float /*deltaTime*/) override
         {
-            (void)deltaTime;
-            if (m_achievements) m_achievements->Update();
+            if (m_achievements)
+            {
+                m_achievements->Update();
+            }
         }
-        
-        const char* GetDebugName() const override { return "Achievements Updater"; }
+
+        std::unique_ptr<Component> Clone(GameObject* pOwner) const override
+        {
+            return std::make_unique<AchievementsUpdaterComponent>(pOwner, m_achievements);
+        }
 
     private:
         Achievements* m_achievements;

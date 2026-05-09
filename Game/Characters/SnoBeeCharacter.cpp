@@ -1,9 +1,11 @@
 #include "SnoBeeCharacter.h"
+#include "GameObject.h"
 
 #include <cmath>
 #include <memory>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <thread>
 
 #include "AnalogStickMoveComponent.h"
 #include "AddScoreCommand.h"
@@ -13,6 +15,7 @@
 #include "LoseLifeCommand.h"
 #include "MoveCommand.h"
 #include "State.h"
+#include "RenderComponent.h"
 
 namespace
 {
@@ -70,6 +73,15 @@ namespace
         }
     }
 
+    // Per.7: Design to Enable Optimization.
+    // We separate the data needed for AI decision-making into a small, cache-friendly struct.
+    struct AIUpdateData
+    {
+        int health;
+        glm::vec3 currentPosition;
+        glm::vec3 previousPosition;
+    };
+
     class EnemyStateMachineComponent final : public dae::Component
     {
     public:
@@ -77,6 +89,15 @@ namespace
             : Component(owner), m_previousPosition(owner != nullptr ? owner->GetLocalPosition() : glm::vec3{})
         {
             ChangeState(dae::EnemyState::Idle);
+        }
+
+        std::unique_ptr<dae::Component> Clone(dae::GameObject* pOwner) const override
+        {
+            auto clone = std::make_unique<EnemyStateMachineComponent>(pOwner);
+            clone->m_currentState = m_currentState;
+            clone->m_previousPosition = m_previousPosition;
+            // This is tricky, we might need a deep copy of states if they hold data
+            return clone;
         }
 
         void Update(float deltaTime) override
@@ -98,7 +119,22 @@ namespace
                 m_pCurrentState->Update(*owner, deltaTime);
             }
 
-            const auto nextState = DetermineState(*owner, *character);
+            AIUpdateData updateData{
+                character->health,
+                owner->GetLocalPosition(),
+                m_previousPosition
+            };
+
+            dae::EnemyState nextState = m_currentState;
+
+            std::jthread aiThread([&nextState, updateData]() {
+                nextState = DetermineState(updateData);
+            });
+            // Automatically joins upon destruction of the jthread,
+            // ensuring the state is determined before we proceed.
+            // Wait for thread to finish so nextState is valid
+            aiThread.join();
+
             if (nextState != m_currentState)
             {
                 ChangeState(nextState);
@@ -110,20 +146,19 @@ namespace
         const char *GetDebugName() const override { return "Enemy State Machine"; }
 
     private:
-        static bool HasMoved(const dae::GameObject &owner, const glm::vec3 &previousPosition)
+        static dae::EnemyState DetermineState(const AIUpdateData& data)
         {
-            const glm::vec3 delta = owner.GetLocalPosition() - previousPosition;
-            return std::fabs(delta.x) > g_MovementEpsilon || std::fabs(delta.y) > g_MovementEpsilon || std::fabs(delta.z) > g_MovementEpsilon;
-        }
-
-        dae::EnemyState DetermineState(const dae::GameObject &owner, const dae::Character &character) const
-        {
-            if (character.health <= 0)
+            if (data.health <= 0)
             {
                 return dae::EnemyState::Dying;
             }
 
-            if (HasMoved(owner, m_previousPosition))
+            const glm::vec3 delta = data.currentPosition - data.previousPosition;
+            const bool hasMoved = std::fabs(delta.x) > g_MovementEpsilon ||
+                                  std::fabs(delta.y) > g_MovementEpsilon ||
+                                  std::fabs(delta.z) > g_MovementEpsilon;
+
+            if (hasMoved)
             {
                 return dae::EnemyState::Walking;
             }
@@ -160,6 +195,8 @@ dae::SnoBeeCharacter::SnoBeeCharacter(ResourceManager &resourceManager)
     AddComponent<EnemyStateMachineComponent>();
 }
 
+dae::SnoBeeCharacter::~SnoBeeCharacter() = default;
+
 void dae::SnoBeeCharacter::BindGamepadControls(InputManager &inputManager, const std::uint32_t gamepadIndex)
 {
     inputManager.BindGamepadCommand(gamepadIndex, Gamepad::Button::DPadUp, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0.0f, -1.0f}, g_MoveSpeed));
@@ -169,5 +206,36 @@ void dae::SnoBeeCharacter::BindGamepadControls(InputManager &inputManager, const
     inputManager.BindGamepadCommand(gamepadIndex, Gamepad::Button::X, KeyState::Down, std::make_unique<LoseLifeCommand>(*this));
     inputManager.BindGamepadCommand(gamepadIndex, Gamepad::Button::A, KeyState::Down, std::make_unique<AddScoreCommand>(*this, 10));
     inputManager.BindGamepadCommand(gamepadIndex, Gamepad::Button::B, KeyState::Down, std::make_unique<AddScoreCommand>(*this, 100));
-    AddComponent<AnalogStickMoveComponent>(inputManager, gamepadIndex, g_MoveSpeed);
+    m_pMoveComponent = AddComponent<AnalogStickMoveComponent>(inputManager, gamepadIndex, g_MoveSpeed);
+}
+
+void dae::SnoBeeCharacter::ApplyConfig(const SnoBeeConfig& config)
+{
+    m_currentConfig = config;
+    score = config.scoreValue;
+
+    if (m_pMoveComponent)
+    {
+        m_pMoveComponent->SetSpeed(config.speed);
+    }
+
+    if (m_pRenderComponent)
+    {
+        m_pRenderComponent->SetSourceRect(8 * 16.0f, (9 + config.spriteSheetRowOffset) * 16.0f, 16.0f, 16.0f);
+    }
+}
+
+std::unique_ptr<dae::SnoBeeCharacter> dae::SnoBeeCharacter::Clone() const
+{
+    auto clone = std::make_unique<SnoBeeCharacter>(m_resourceManager);
+    clone->ApplyConfig(m_currentConfig);
+    // Note: We don't automatically clone input bindings here, they are assumed to be separate.
+    return clone;
+}
+
+std::unique_ptr<dae::SnoBeeCharacter> dae::SnoBeeCharacter::Spawn(const SnoBeeCharacter& prototype, const SnoBeeConfig& config)
+{
+    auto cloned = prototype.Clone();
+    cloned->ApplyConfig(config);
+    return cloned;
 }

@@ -33,8 +33,23 @@ void dae::Character::AddScore(const int points)
 
 void dae::Character::InitializeSprite(const float sourceX, const float sourceY)
 {
-    auto *renderComponent = AddComponent<RenderComponent>(m_resourceManager);
-    renderComponent->SetTexture("pengo.png");
-    renderComponent->SetSourceRect(sourceX, sourceY, m_spriteSize, m_spriteSize);
-    renderComponent->SetRenderSize(m_displaySize, m_displaySize);
+    m_pRenderComponent = AddComponent<RenderComponent>(m_resourceManager);
+    m_pRenderComponent->SetTexture("pengo.png");
+    m_pRenderComponent->SetSourceRect(sourceX, sourceY, m_spriteSize, m_spriteSize);
+    m_pRenderComponent->SetRenderSize(m_displaySize, m_displaySize);
+}
+
+void dae::Character::SetSpriteTexture(std::string_view filename)
+{
+    if (m_pRenderComponent) m_pRenderComponent->SetTexture(filename);
+}
+
+void dae::Character::SetSpriteSourceRect(float x, float y, float w, float h)
+{
+    if (m_pRenderComponent) m_pRenderComponent->SetSourceRect(x, y, w, h);
+}
+
+void dae::Character::SetSpriteRenderSize(float w, float h)
+{
+    if (m_pRenderComponent) m_pRenderComponent->SetRenderSize(w, h);
 }

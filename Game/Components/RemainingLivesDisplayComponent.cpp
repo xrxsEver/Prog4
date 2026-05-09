@@ -1,12 +1,12 @@
 #include "RemainingLivesDisplayComponent.h"
-
-#include <string>
-#include <utility>
+#include <format>
+#include <iostream>
+#include <stdexcept>
+#include <imgui.h>
 
 #include "Character.h"
 #include "GameObject.h"
 #include "TextComponent.h"
-#include <imgui.h>
 
 dae::RemainingLivesDisplayComponent::RemainingLivesDisplayComponent(GameObject *pOwner, Character *pCharacter)
     : RemainingLivesDisplayComponent(pOwner, pCharacter, "Lives")
@@ -44,7 +44,7 @@ void dae::RemainingLivesDisplayComponent::Update(float deltaTime)
         return;
     }
 
-    if (m_cachedLives != m_pCharacter->health)
+    if (m_pCharacter->health != m_cachedLives)
     {
         RefreshText();
     }
@@ -58,9 +58,15 @@ void dae::RemainingLivesDisplayComponent::OnNotify(const GameEvent event)
     }
 }
 
+std::unique_ptr<dae::Component> dae::RemainingLivesDisplayComponent::Clone(GameObject* pOwner) const
+{
+    return std::make_unique<RemainingLivesDisplayComponent>(pOwner, m_pCharacter, m_labelPrefix);
+}
+
 void dae::RemainingLivesDisplayComponent::DrawInspector() const
 {
-    ImGui::Text("Bound character: %s", m_pCharacter ? m_pCharacter->GetName().c_str() : "missing");
+    ImGui::Text("Observing: %s", m_pCharacter ? m_pCharacter->GetName().c_str() : "none");
+    ImGui::Text("Label prefix: %s", m_labelPrefix.c_str());
     ImGui::Text("Cached lives: %d", m_cachedLives);
 }
 

@@ -58,6 +58,15 @@ void dae::RenderComponent::SetRenderSize(float w, float h)
     m_dstSize = SDL_FRect{0.f, 0.f, w, h};
 }
 
+std::unique_ptr<dae::Component> dae::RenderComponent::Clone(GameObject* pOwner) const
+{
+    auto clone = std::make_unique<RenderComponent>(pOwner, *m_pResourceManager);
+    clone->m_texture = m_texture;
+    clone->m_srcRect = m_srcRect;
+    clone->m_dstSize = m_dstSize;
+    return clone;
+}
+
 void dae::RenderComponent::DrawInspector() const
 {
     ImGui::Text("Texture: %s", m_texture ? "loaded" : "none");

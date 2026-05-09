@@ -1,5 +1,6 @@
 #pragma once
 #include "Component.h"
+#include <string>
 
 namespace dae
 {
@@ -11,12 +12,13 @@ namespace dae
         explicit FPSComponent(GameObject *pOwner);
 
         void Update(float deltaTime) override;
-        const char *GetDebugName() const override { return "FPS"; }
+
+        const char *GetDebugName() const override { return "FPS Counter"; }
         void DrawInspector() const override;
+        std::unique_ptr<Component> Clone(GameObject* pOwner) const override;
 
     private:
         TextComponent *m_pTextComponent{};
-        int m_frameCount{};
-        float m_elapsedTime{};
+        float m_timeSinceLastUpdate{};
     };
 }

@@ -1,17 +1,16 @@
 #include "PengoCharacter.h"
-#include "InputManager.h"
-#include "ResourceManager.h"
+#include "PengoState.h"
 #include "RenderComponent.h"
+#include "InputManager.h"
+#include "MoveCommand.h"
+#include "MoveReleaseCommand.h"
 #include "GameTime.h"
-#include "PengoInputCommands.h" // Use the new input commands
-#include <cmath>
 #include <iostream>
-#include <algorithm>
 
 namespace dae
 {
-    constexpr float PENGUIN_MOVE_SPEED = 140.f; // Increased speed to snap faster
-    constexpr float MOVEMENT_EPSILON = 0.001f;
+    constexpr float MOVE_SPEED = 140.0f;
+    constexpr float ANIMATION_SPEED = 0.2f;
     constexpr float SPRITE_SIZE = 16.0f;
 
     // Component to bridge GameObject::Update to PengoCharacter's State Machine
@@ -19,6 +18,11 @@ namespace dae
     {
     public:
         explicit PengoUpdateComponent(GameObject* owner) : Component(owner) {}
+
+        std::unique_ptr<Component> Clone(GameObject* pOwner) const override
+        {
+            return std::make_unique<PengoUpdateComponent>(pOwner);
+        }
 
         void Update(float /*deltaTime*/) override
         {
@@ -31,8 +35,7 @@ namespace dae
 
     PengoCharacter::PengoCharacter(ResourceManager& resourceManager)
         : Character("Pengo", resourceManager),
-          m_pCurrentState(new IdleState()),
-          m_pNextState(nullptr),
+          m_pCurrentState(std::make_unique<IdleState>()),
           m_previousPosition(GetLocalPosition()),
           m_pRenderComponent(nullptr)
     {
@@ -42,110 +45,94 @@ namespace dae
 
         if (m_pRenderComponent)
         {
-            SetAnimationFrame(0);
+            m_pRenderComponent->SetRenderSize(32.f, 32.f);
         }
 
         // Add the bridge component so the state machine updates during GameObject::Update
         AddComponent<PengoUpdateComponent>();
-
-        m_pCurrentState->OnEnter(this);
     }
 
     PengoCharacter::~PengoCharacter()
     {
-        delete m_pCurrentState;
-        m_pCurrentState = nullptr;
-        delete m_pNextState;
-        m_pNextState = nullptr;
-    }
-
-    void PengoCharacter::UpdateStateMachine()
-    {
-        // 1. Process movement based on the active inputs stack
-        ProcessMovement();
-
-        // 2. Let states transition
-        if (!m_pNextState)
-        {
-            m_pNextState = m_pCurrentState->Update(this);
-        }
-
-        ApplyStateSwap();
-
-        // 3. Update position history for HasMoved() check
-        m_previousPosition = GetLocalPosition();
-    }
-
-    void PengoCharacter::ProcessMovement()
-    {
-        const float dt = GameTime::GetInstance().GetDeltaTime();
-        glm::vec3 currentPos = GetLocalPosition();
-
-        // 1. Apply velocity if we have a target
-        if (m_isMovingToTarget)
-        {
-            glm::vec3 direction = glm::normalize(m_targetPosition - currentPos);
-            currentPos += direction * PENGUIN_MOVE_SPEED * dt;
-
-            // Check if we've reached or overshot the target
-            if (glm::distance(currentPos, m_targetPosition) < MOVEMENT_EPSILON || glm::dot(direction, m_targetPosition - currentPos) < 0)
-            {
-                currentPos = m_targetPosition;
-                m_isMovingToTarget = false;
-            }
-            SetLocalPosition(currentPos);
-        }
-
-        // 2. If we are NO LONGER moving (either reached target above, or standing still),
-        //    check if the player is holding a key to immediately set a new target in the SAME frame.
-        if (!m_isMovingToTarget && !m_activeMoveInputs.empty())
-        {
-            PengoDirection activeDirection = m_activeMoveInputs.back();
-            SetDirection(activeDirection);
-
-            m_targetPosition = currentPos;
-            switch (activeDirection)
-            {
-                case PengoDirection::Up:    m_targetPosition.y -= m_blockSize; break;
-                case PengoDirection::Down:  m_targetPosition.y += m_blockSize; break;
-                case PengoDirection::Left:  m_targetPosition.x -= m_blockSize; break;
-                case PengoDirection::Right: m_targetPosition.x += m_blockSize; break;
-            }
-            m_isMovingToTarget = true;
-        }
-    }
-
-    void PengoCharacter::ApplyStateSwap()
-    {
-        if (m_pNextState != nullptr)
-        {
-            m_pCurrentState->OnExit(this);
-            delete m_pCurrentState;
-            m_pCurrentState = m_pNextState;
-            m_pNextState = nullptr;
-            m_pCurrentState->OnEnter(this);
-        }
     }
 
     void PengoCharacter::BindKeyboardControls(InputManager& inputManager)
     {
-        // Key Down - Start tracking input
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Down, std::make_unique<MoveInputStartCommand>(*this, PengoDirection::Up));
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Down, std::make_unique<MoveInputStartCommand>(*this, PengoDirection::Down));
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Down, std::make_unique<MoveInputStartCommand>(*this, PengoDirection::Left));
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Down, std::make_unique<MoveInputStartCommand>(*this, PengoDirection::Right));
+        // Directional Movement - Pressed
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0, -1}, MOVE_SPEED));
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0, 1}, MOVE_SPEED));
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{-1, 0}, MOVE_SPEED));
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{1, 0}, MOVE_SPEED));
 
-        // Key Up - Stop tracking input
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Up, std::make_unique<MoveInputStopCommand>(*this, PengoDirection::Up));
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Up, std::make_unique<MoveInputStopCommand>(*this, PengoDirection::Down));
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Up, std::make_unique<MoveInputStopCommand>(*this, PengoDirection::Left));
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Up, std::make_unique<MoveInputStopCommand>(*this, PengoDirection::Right));
+        // Directional Movement - Released
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{0, -1}));
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{0, 1}));
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{-1, 0}));
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{1, 0}));
+
+
     }
+
+    void PengoCharacter::UpdateStateMachine()
+    {
+        // Handle movement processing (grid snapping, target reaching)
+        ProcessMovement();
+
+        // Determine if we need to change state based on input or logic
+        std::unique_ptr<PengoState> nextState = m_pCurrentState->HandleInput(this);
+
+        if (nextState == nullptr)
+        {
+            nextState = m_pCurrentState->Update(this);
+        }
+
+        if (nextState != nullptr)
+        {
+            m_pCurrentState->OnExit(this);
+            m_pCurrentState = std::move(nextState);
+            m_pCurrentState->OnEnter(this);
+        }
+
+        UpdateRenderComponent();
+        // Keep track of previous position for next frame's input inference
+        m_previousPosition = GetLocalPosition();
+    }
+
+    void PengoCharacter::SetSpriteData(int row, int startCol, bool isMoving)
+    {
+        m_spriteRow = row;
+        m_spriteStartCol = startCol;
+        m_isMoving = isMoving;
+    }
+
+    void PengoCharacter::UpdateRenderComponent()
+    {
+        if (m_pRenderComponent)
+        {
+            if (m_animationFrame != -1)
+            {
+                m_pRenderComponent->SetSourceRect(
+                    m_animationFrame * SPRITE_SIZE,
+                    0,
+                    SPRITE_SIZE,
+                    SPRITE_SIZE
+                );
+            }
+        }
+    }
+
+    void PengoCharacter::ApplyStateSwap() {}
+
+    bool PengoCharacter::HasMoved() const { return m_isMovingToTarget || !m_activeMoveInputs.empty(); }
+
+    void PengoCharacter::SetDirection(PengoDirection direction) { m_currentDirection = direction; }
+    PengoDirection PengoCharacter::GetDirection() const { return m_currentDirection; }
+    void PengoCharacter::SetAnimationFrame(int frameIndex) { m_animationFrame = frameIndex; }
 
     void PengoCharacter::AddMoveInput(PengoDirection direction)
     {
-        // Avoid adding duplicates if the OS sends repeat keydown events
-        if (std::find(m_activeMoveInputs.begin(), m_activeMoveInputs.end(), direction) == m_activeMoveInputs.end())
+        auto it = std::find(m_activeMoveInputs.begin(), m_activeMoveInputs.end(), direction);
+        if (it == m_activeMoveInputs.end())
         {
             m_activeMoveInputs.push_back(direction);
         }
@@ -153,48 +140,51 @@ namespace dae
 
     void PengoCharacter::RemoveMoveInput(PengoDirection direction)
     {
-        m_activeMoveInputs.erase(
-            std::remove(m_activeMoveInputs.begin(), m_activeMoveInputs.end(), direction),
-            m_activeMoveInputs.end()
-        );
-    }
-
-    bool PengoCharacter::HasMoved() const
-    {
-        // Relying entirely on our boolean instead of checking previous positions.
-        // This stops the character from dropping out of the MovingState for 1 frame
-        // every time he reaches the edge of a grid cell!
-        return m_isMovingToTarget;
-    }
-
-    void PengoCharacter::SetDirection(PengoDirection direction)
-    {
-        m_currentDirection = direction;
-    }
-
-    PengoDirection PengoCharacter::GetDirection() const
-    {
-        return m_currentDirection;
-    }
-
-    void PengoCharacter::SetAnimationFrame(int frameIndex)
-    {
-        if (m_animationFrame == frameIndex)
-            return;
-
-        m_animationFrame = frameIndex;
-        UpdateRenderComponent();
-    }
-
-    void PengoCharacter::UpdateRenderComponent()
-    {
-        if (m_pRenderComponent)
+        auto it = std::find(m_activeMoveInputs.begin(), m_activeMoveInputs.end(), direction);
+        if (it != m_activeMoveInputs.end())
         {
-            m_pRenderComponent->SetSourceRect(
-                static_cast<float>(m_animationFrame) * SPRITE_SIZE,
-                0.0f,
-                SPRITE_SIZE,
-                SPRITE_SIZE);
+            m_activeMoveInputs.erase(it);
+        }
+    }
+
+    void PengoCharacter::ProcessMovement()
+    {
+        if (m_isMovingToTarget)
+        {
+            glm::vec3 currentPos = GetLocalPosition();
+            glm::vec3 toTarget = m_targetPosition - currentPos;
+            float distance = glm::length(toTarget);
+            float moveDist = MOVE_SPEED * GameTime::GetInstance().GetDeltaTime();
+
+            if (moveDist >= distance)
+            {
+                SetLocalPosition(m_targetPosition);
+                m_isMovingToTarget = false;
+            }
+            else
+            {
+                SetLocalPosition(currentPos + glm::normalize(toTarget) * moveDist);
+            }
+        }
+
+        if (!m_isMovingToTarget && !m_activeMoveInputs.empty())
+        {
+            PengoDirection nextDir = m_activeMoveInputs.back();
+            m_currentDirection = nextDir;
+
+            glm::vec3 currentPos = GetLocalPosition();
+            glm::vec3 directionVec{0, 0, 0};
+
+            switch (nextDir)
+            {
+            case PengoDirection::Up:    directionVec.y = -1; break;
+            case PengoDirection::Down:  directionVec.y = 1;  break;
+            case PengoDirection::Left:  directionVec.x = -1; break;
+            case PengoDirection::Right: directionVec.x = 1;  break;
+            }
+
+            m_targetPosition = currentPos + directionVec * m_blockSize;
+            m_isMovingToTarget = true;
         }
     }
 }

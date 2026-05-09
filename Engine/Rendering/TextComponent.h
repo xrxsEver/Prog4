@@ -18,6 +18,7 @@ namespace dae
         void Render() const override;
         const char *GetDebugName() const override { return "Text"; }
         void DrawInspector() const override;
+        std::unique_ptr<Component> Clone(GameObject* pOwner) const override;
 
         void SetText(const std::string &text);
         void SetColor(const SDL_Color &color);

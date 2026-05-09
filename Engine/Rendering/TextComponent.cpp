@@ -81,6 +81,14 @@ void dae::TextComponent::SetColor(const SDL_Color &color)
     m_needsUpdate = true;
 }
 
+std::unique_ptr<dae::Component> dae::TextComponent::Clone(GameObject* pOwner) const
+{
+    auto clone = std::make_unique<TextComponent>(pOwner, m_text, m_font, m_color);
+    clone->m_needsUpdate = m_needsUpdate;
+    clone->m_textTexture = m_textTexture;
+    return clone;
+}
+
 void dae::TextComponent::DrawInspector() const
 {
     ImGui::TextWrapped("Text: %s", m_text.c_str());

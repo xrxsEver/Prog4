@@ -18,6 +18,7 @@ namespace dae
         void Render() const override;
         const char *GetDebugName() const override { return "Render"; }
         void DrawInspector() const override;
+        std::unique_ptr<Component> Clone(GameObject* pOwner) const override;
 
         void SetTexture(std::string_view filename);
         void SetTexture(std::shared_ptr<Texture2D> texture);

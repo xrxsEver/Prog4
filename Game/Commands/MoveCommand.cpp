@@ -2,31 +2,30 @@
 #include "GameObject.h"
 #include "GameTime.h"
 #include "PengoCharacter.h"
+#include "InputManager.h"
 
 namespace dae
 {
-    MoveCommand::MoveCommand(GameObject &actor, const glm::vec2 direction, const float speed)
-        : GameActorCommand(actor), m_direction(direction), m_speed(speed)
+    MoveCommand::MoveCommand(GameObject &actor, const glm::vec2 direction, const float /*speed*/)
+        : GameActorCommand(actor), m_direction(direction), m_speed(0.0f)
     {
     }
 
     void MoveCommand::Execute()
     {
-        const float dt = GameTime::GetInstance().GetDeltaTime();
         auto &actor = GetActor();
 
-        // If the actor is a PengoCharacter, update its current direction
+        // If the actor is a PengoCharacter, use its input priority system
         if (auto* pengo = dynamic_cast<PengoCharacter*>(&actor))
         {
-            // Convert glm::vec2 direction to PengoDirection enum
-            if (m_direction.y > 0) pengo->SetDirection(PengoDirection::Down);
-            else if (m_direction.x < 0) pengo->SetDirection(PengoDirection::Left);
-            else if (m_direction.y < 0) pengo->SetDirection(PengoDirection::Up);
-            else if (m_direction.x > 0) pengo->SetDirection(PengoDirection::Right);
-        }
+            PengoDirection dir;
+            if (m_direction.y > 0) dir = PengoDirection::Down;
+            else if (m_direction.x < 0) dir = PengoDirection::Left;
+            else if (m_direction.y < 0) dir = PengoDirection::Up;
+            else if (m_direction.x > 0) dir = PengoDirection::Right;
+            else return;
 
-        const glm::vec3 currentPos = actor.GetLocalPosition();
-        const glm::vec3 movement{m_direction.x * m_speed * dt, m_direction.y * m_speed * dt, 0.0f};
-        actor.SetLocalPosition(currentPos + movement);
+            pengo->AddMoveInput(dir);
+        }
     }
 }
