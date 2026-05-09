@@ -17,7 +17,8 @@ namespace dae
         , m_resourceManager(resourceManager)
         , m_onFinished(onFinished)
     {
-        m_texture = m_resourceManager.LoadTexture("Playfield.png");
+        m_backgroundTexture = m_resourceManager.LoadTexture("Playfield.png");
+        m_iceBlockTexture = m_resourceManager.LoadTexture("iceblock.png");
 
         // Generate the maze
         MazeGenerator generator;
@@ -81,14 +82,17 @@ namespace dae
         auto& renderer = Renderer::GetInstance();
         const auto& worldPos = GetOwner()->GetWorldPosition();
 
-        // 1. Render the background (scaled)
-        // Adjust background size to match the grid exactly
-        SDL_FRect srcBackground = { 0.0f, 0.0f, 224.0f, 288.0f };
-        float gridWidth = m_cols * m_blockSize;
-        float gridHeight = m_rows * m_blockSize;
-        renderer.RenderTexture(*m_texture, srcBackground, worldPos.x, worldPos.y, gridWidth, gridHeight);
+        // 1. Render the background
+        SDL_FRect srcBackground = { 0.0f, 0.0f, 224.0f, 256.0f };
+        float scale = m_blockSize / 16.0f;
+        float bgWidth = 224.0f * scale;
+        float bgHeight = 256.0f * scale;
+        renderer.RenderTexture(*m_backgroundTexture, srcBackground, worldPos.x, worldPos.y, bgWidth, bgHeight);
 
         // 2. Render Grid Tiles (Blocks)
+        // The ice block texture is 16x16
+        SDL_FRect srcRect = { 0.0f, 0.0f, 16.0f, 16.0f };
+
         // This loop separates Logical Grid (r, c) from Screen Rendering (pixels)
         for (const auto& b : m_blocks)
         {
@@ -100,18 +104,8 @@ namespace dae
             float dstX = worldPos.x + screenPos.x;
             float dstY = worldPos.y + screenPos.y;
 
-            // Boundary Check & Texture Sampling: 
-            // Playfield.png has a 14x18 grid of 16px blocks starting at x=228.
-            // We clamp indices to ensure we stay within the source texture bounds.
-            int sampledCol = std::clamp(b.c, 0, 13);
-            int sampledRow = std::clamp(b.r, 0, 17);
-
-            float srcX = 228.0f + (float)sampledCol * 16.0f;
-            float srcY = (float)sampledRow * 16.0f;
-            SDL_FRect srcRect = { srcX, srcY, 16.0f, 16.0f };
-
             // Actual Render Call
-            renderer.RenderTexture(*m_texture, srcRect, dstX, dstY, m_blockSize, m_blockSize);
+            renderer.RenderTexture(*m_iceBlockTexture, srcRect, dstX, dstY, m_blockSize, m_blockSize);
         }
     }
 

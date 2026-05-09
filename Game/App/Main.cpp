@@ -87,7 +87,12 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 
 	auto pengo = std::make_unique<dae::PengoCharacter>(resourceManager);
 	auto *pengoPtr = pengo.get();
-	pengo->SetPosition(384, 288);
+
+    // Set exact pixel position on the grid
+    // Col 6, Row 7 with an offset of 16 and a block size of 32
+    // X = 16 + (6 * 32) = 208
+    // Y = 16 + (7 * 32) = 240
+	pengo->SetPosition(208, 240);
 	pengo->BindKeyboardControls(inputManager);
 	scene.Add(std::move(pengo));
 

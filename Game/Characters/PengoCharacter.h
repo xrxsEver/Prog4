@@ -61,6 +61,12 @@ namespace dae
 
         // Stack to track currently held movement keys
         std::vector<PengoDirection> m_activeMoveInputs;
+
+        // Grid movement variables
+        glm::vec3 m_targetPosition{};
+        bool m_isMovingToTarget{false};
+
+        static constexpr float m_blockSize = 32.0f;
     };
 }
 

@@ -27,7 +27,7 @@ namespace dae
         int targetEmptyCount = static_cast<int>(innerTiles * config.emptyDensity);
 
         std::vector<std::pair<int, int>> spawnPoints = {
-            {config.rows / 2, config.cols / 2}, // Center
+            {config.rows / 2, config.cols / 2}, // Center (Pengo spawn)
             {1, 1},                             // Top-left
             {1, config.cols - 2},                // Top-right
             {config.rows - 2, 1},                // Bottom-left
@@ -73,7 +73,7 @@ namespace dae
             return true;
         };
 
-        // Step 2 & 5: Clear spawn points and ensure they are connected
+        // Ensure Pengo's spawn point is ALWAYS empty right away
         makeEmpty(spawnPoints[0].first, spawnPoints[0].second);
         
         for (size_t i = 1; i < spawnPoints.size(); ++i)

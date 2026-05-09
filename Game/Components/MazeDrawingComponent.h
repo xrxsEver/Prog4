@@ -25,7 +25,8 @@ namespace dae
 
     private:
         ResourceManager& m_resourceManager;
-        std::shared_ptr<Texture2D> m_texture;
+        std::shared_ptr<Texture2D> m_backgroundTexture{nullptr};
+        std::shared_ptr<Texture2D> m_iceBlockTexture{nullptr};
         
         struct Block {
             int r, c;
@@ -40,13 +41,12 @@ namespace dae
         bool m_isFinished{false};
         std::function<void()> m_onFinished;
 
-        static constexpr int m_rows = 17;
-        static constexpr int m_cols = 15;
+        static constexpr int m_rows = 15;
+        static constexpr int m_cols = 13;
         
-        // Scaled values (factor 2.0 to fit 576px height)
         static constexpr float m_blockSize = 32.0f;
-        static constexpr float m_offsetX = 0.0f;
-        static constexpr float m_offsetY = 0.0f;
+        static constexpr float m_offsetX = 16.0f;
+        static constexpr float m_offsetY = 16.0f;
 
         glm::vec2 GetScreenPos(int r, int c) const;
     };

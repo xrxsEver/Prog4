@@ -10,7 +10,7 @@
 
 namespace dae
 {
-    constexpr float PENGUIN_MOVE_SPEED = 100.f;
+    constexpr float PENGUIN_MOVE_SPEED = 140.f; // Increased speed to snap faster
     constexpr float MOVEMENT_EPSILON = 0.001f;
     constexpr float SPRITE_SIZE = 16.0f;
 
@@ -78,31 +78,41 @@ namespace dae
 
     void PengoCharacter::ProcessMovement()
     {
-        // If there are no keys held down, we don't move.
-        if (m_activeMoveInputs.empty())
-        {
-            return;
-        }
-
-        // Latest Key Priority: The last key pressed is at the back of the vector.
-        PengoDirection activeDirection = m_activeMoveInputs.back();
-
-        // Set the facing direction for animations
-        SetDirection(activeDirection);
-
-        // Apply Movement
         const float dt = GameTime::GetInstance().GetDeltaTime();
-        glm::vec3 movement{0.0f, 0.0f, 0.0f};
+        glm::vec3 currentPos = GetLocalPosition();
 
-        switch (activeDirection)
+        // 1. Apply velocity if we have a target
+        if (m_isMovingToTarget)
         {
-            case PengoDirection::Up:    movement.y = -PENGUIN_MOVE_SPEED * dt; break;
-            case PengoDirection::Down:  movement.y = PENGUIN_MOVE_SPEED * dt; break;
-            case PengoDirection::Left:  movement.x = -PENGUIN_MOVE_SPEED * dt; break;
-            case PengoDirection::Right: movement.x = PENGUIN_MOVE_SPEED * dt; break;
+            glm::vec3 direction = glm::normalize(m_targetPosition - currentPos);
+            currentPos += direction * PENGUIN_MOVE_SPEED * dt;
+
+            // Check if we've reached or overshot the target
+            if (glm::distance(currentPos, m_targetPosition) < MOVEMENT_EPSILON || glm::dot(direction, m_targetPosition - currentPos) < 0)
+            {
+                currentPos = m_targetPosition;
+                m_isMovingToTarget = false;
+            }
+            SetLocalPosition(currentPos);
         }
 
-        SetLocalPosition(GetLocalPosition() + movement);
+        // 2. If we are NO LONGER moving (either reached target above, or standing still),
+        //    check if the player is holding a key to immediately set a new target in the SAME frame.
+        if (!m_isMovingToTarget && !m_activeMoveInputs.empty())
+        {
+            PengoDirection activeDirection = m_activeMoveInputs.back();
+            SetDirection(activeDirection);
+
+            m_targetPosition = currentPos;
+            switch (activeDirection)
+            {
+                case PengoDirection::Up:    m_targetPosition.y -= m_blockSize; break;
+                case PengoDirection::Down:  m_targetPosition.y += m_blockSize; break;
+                case PengoDirection::Left:  m_targetPosition.x -= m_blockSize; break;
+                case PengoDirection::Right: m_targetPosition.x += m_blockSize; break;
+            }
+            m_isMovingToTarget = true;
+        }
     }
 
     void PengoCharacter::ApplyStateSwap()
@@ -151,8 +161,10 @@ namespace dae
 
     bool PengoCharacter::HasMoved() const
     {
-        const glm::vec3 delta = GetLocalPosition() - m_previousPosition;
-        return std::fabs(delta.x) > MOVEMENT_EPSILON || std::fabs(delta.y) > MOVEMENT_EPSILON;
+        // Relying entirely on our boolean instead of checking previous positions.
+        // This stops the character from dropping out of the MovingState for 1 frame
+        // every time he reaches the edge of a grid cell!
+        return m_isMovingToTarget;
     }
 
     void PengoCharacter::SetDirection(PengoDirection direction)
