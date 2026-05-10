@@ -159,7 +159,7 @@ namespace dae
         const auto& worldPos = GetOwner()->GetWorldPosition();
 
         // Render background
-        SDL_FRect srcBackground = { 0.0f, 0.0f, 224.0f, 256.0f };
+        Rect srcBackground = { 0.0f, 0.0f, 224.0f, 256.0f };
         float scale = m_blockSize / 16.0f;
         float bgWidth = 224.0f * scale;
         float bgHeight = 256.0f * scale;
@@ -167,7 +167,7 @@ namespace dae
 
         // Render Grid Tiles (Blocks)
         // The ice block texture is 16x16
-        SDL_FRect srcRect = { 0.0f, 0.0f, 16.0f, 16.0f };
+        Rect srcRect = { 0.0f, 0.0f, 16.0f, 16.0f };
 
         // This loop separates Logical Grid (r, c) from Screen Rendering (pixels)
         for (const auto& b : m_blocks)
@@ -182,7 +182,7 @@ namespace dae
 
             if (b.isSpawning)
             {
-                SDL_FRect animSrc;
+                Rect animSrc;
                 if (m_spawnStep == SpawnStep::IceBreaking)
                 {
                     // Ice breaking is likely 9 frames. 

@@ -1,5 +1,4 @@
 #pragma once
-#include <SDL3/SDL.h>
 #include "Singleton.h"
 #include <string>
 #include <vector>
@@ -14,11 +13,11 @@ namespace dae
     class ImGuiManager final : public Singleton<ImGuiManager>
     {
     public:
-        void Init(SDL_Window *window, SDL_Renderer *renderer, SceneManager &sceneManager, InputManager &inputManager);
+        void Init(SceneManager &sceneManager, InputManager &inputManager);
         void ShutDown();
 
         void BeginFrame();
-        void EndFrame(SDL_Renderer *renderer);
+        void EndFrame();
         void AddCustomTab(const std::string& name, std::function<void()> renderFunc);
 
     private:

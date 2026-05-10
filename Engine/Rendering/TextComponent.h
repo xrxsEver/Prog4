@@ -1,8 +1,10 @@
 #pragma once
 #include <string>
 #include <memory>
-#include <SDL3/SDL.h>
 #include "Component.h"
+#include "Renderer.h"
+
+struct SDL_Color;
 
 namespace dae
 {
@@ -12,7 +14,11 @@ namespace dae
     class TextComponent final : public Component
     {
     public:
-        TextComponent(GameObject *pOwner, const std::string &text, std::shared_ptr<Font> font, const SDL_Color &color = {255, 255, 255, 255});
+        struct Color {
+            unsigned char r, g, b, a;
+        };
+
+        TextComponent(GameObject *pOwner, const std::string &text, std::shared_ptr<Font> font, const Color &color = {255, 255, 255, 255});
 
         void Update(float deltaTime) override;
         void Render() const override;
@@ -21,12 +27,12 @@ namespace dae
         std::unique_ptr<Component> Clone(GameObject* pOwner) const override;
 
         void SetText(const std::string &text);
-        void SetColor(const SDL_Color &color);
+        void SetColor(const Color &color);
 
     private:
         bool m_needsUpdate{true};
         std::string m_text;
-        SDL_Color m_color{255, 255, 255, 255};
+        Color m_color{255, 255, 255, 255};
         std::shared_ptr<Font> m_font;
         std::shared_ptr<Texture2D> m_textTexture;
     };

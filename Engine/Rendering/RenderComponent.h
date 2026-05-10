@@ -2,8 +2,8 @@
 #include <memory>
 #include <string_view>
 #include <optional>
-#include <SDL3/SDL_rect.h>
 #include "Component.h"
+#include "Renderer.h"
 
 namespace dae
 {
@@ -28,7 +28,7 @@ namespace dae
     private:
         ResourceManager *m_pResourceManager{};
         std::shared_ptr<Texture2D> m_texture{};
-        std::optional<SDL_FRect> m_srcRect{};
-        std::optional<SDL_FRect> m_dstSize{};
+        std::optional<Rect> m_srcRect{};
+        std::optional<Rect> m_dstSize{};
     };
 }

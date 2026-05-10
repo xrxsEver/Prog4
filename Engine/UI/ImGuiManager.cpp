@@ -9,14 +9,13 @@
 #include "AudioLogger.h"
 #include "ServiceLocator.h"
 #include "SoundSystem.h"
+#include "Renderer.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <imgui.h>
-#include <backends/imgui_impl_sdl3.h>
-#include <backends/imgui_impl_sdlrenderer3.h>
 
 namespace
 {
@@ -58,7 +57,7 @@ namespace
     }
 }
 
-void dae::ImGuiManager::Init(SDL_Window *window, SDL_Renderer *renderer, SceneManager &sceneManager, InputManager &inputManager)
+void dae::ImGuiManager::Init(SceneManager &sceneManager, InputManager &inputManager)
 {
     m_pSceneManager = &sceneManager;
     m_pInputManager = &inputManager;
@@ -75,8 +74,7 @@ void dae::ImGuiManager::Init(SDL_Window *window, SDL_Renderer *renderer, SceneMa
 
     ApplyModernStyle();
 
-    ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
-    ImGui_ImplSDLRenderer3_Init(renderer);
+    Renderer::GetInstance().InitImGui();
 }
 
 void dae::ImGuiManager::ApplyModernStyle() const
@@ -122,24 +120,22 @@ void dae::ImGuiManager::ApplyModernStyle() const
 
 void dae::ImGuiManager::ShutDown()
 {
-    ImGui_ImplSDLRenderer3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
+    Renderer::GetInstance().ShutDownImGui();
     ImGui::DestroyContext();
 }
 
 void dae::ImGuiManager::BeginFrame()
 {
-    ImGui_ImplSDLRenderer3_NewFrame();
-    ImGui_ImplSDL3_NewFrame();
+    Renderer::GetInstance().ImGuiNewFrame();
     ImGui::NewFrame();
 
     RenderOverlay();
 }
 
-void dae::ImGuiManager::EndFrame(SDL_Renderer *renderer)
+void dae::ImGuiManager::EndFrame()
 {
     ImGui::Render();
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
+    Renderer::GetInstance().RenderImGui();
 }
 
 void dae::ImGuiManager::RenderOverlay()
@@ -668,4 +664,3 @@ void dae::ImGuiManager::RenderAudioLog() const
     }
     ImGui::EndChild();
 }
-

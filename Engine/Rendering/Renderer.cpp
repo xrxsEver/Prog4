@@ -1,6 +1,10 @@
 ﻿#include <stdexcept>
 #include <cstring>
 #include <iostream>
+#include <SDL3/SDL.h>
+#include <imgui.h>
+#include <backends/imgui_impl_sdl3.h>
+#include <backends/imgui_impl_sdlrenderer3.h>
 #include "Renderer.h"
 #include "Texture2D.h"
 
@@ -30,11 +34,16 @@ void dae::Renderer::ShutDown()
 	m_window = nullptr;
 }
 
-void dae::Renderer::Render() const
+void dae::Renderer::RenderClear() const
 {
 	const auto &color = GetBackgroundColor();
 	SDL_SetRenderDrawColor(m_renderer.get(), color.r, color.g, color.b, color.a);
 	SDL_RenderClear(m_renderer.get());
+}
+
+void dae::Renderer::RenderPresent() const
+{
+	SDL_RenderPresent(m_renderer.get());
 }
 
 void dae::Renderer::Destroy()
@@ -48,7 +57,7 @@ void dae::Renderer::RenderTexture(const Texture2D &texture, const float x, const
 	dst.x = x;
 	dst.y = y;
 	SDL_GetTextureSize(texture.GetSDLTexture(), &dst.w, &dst.h);
-	SDL_RenderTexture(GetSDLRenderer(), texture.GetSDLTexture(), nullptr, &dst);
+	SDL_RenderTexture(m_renderer.get(), texture.GetSDLTexture(), nullptr, &dst);
 }
 
 void dae::Renderer::RenderTexture(const Texture2D &texture, const float x, const float y, const float width, const float height) const
@@ -58,17 +67,44 @@ void dae::Renderer::RenderTexture(const Texture2D &texture, const float x, const
 	dst.y = y;
 	dst.w = width;
 	dst.h = height;
-	SDL_RenderTexture(GetSDLRenderer(), texture.GetSDLTexture(), nullptr, &dst);
+	SDL_RenderTexture(m_renderer.get(), texture.GetSDLTexture(), nullptr, &dst);
 }
 
-void dae::Renderer::RenderTexture(const Texture2D &texture, const SDL_FRect &srcRect, const float x, const float y, const float width, const float height) const
+void dae::Renderer::RenderTexture(const Texture2D &texture, const Rect &srcRect, const float x, const float y, const float width, const float height) const
 {
 	SDL_FRect dst{};
 	dst.x = x;
 	dst.y = y;
 	dst.w = width;
 	dst.h = height;
-	SDL_RenderTexture(GetSDLRenderer(), texture.GetSDLTexture(), &srcRect, &dst);
+	SDL_FRect src{srcRect.x, srcRect.y, srcRect.width, srcRect.height};
+	SDL_RenderTexture(m_renderer.get(), texture.GetSDLTexture(), &src, &dst);
 }
 
-SDL_Renderer *dae::Renderer::GetSDLRenderer() const { return m_renderer.get(); }
+SDL_Texture* dae::Renderer::CreateTextureFromSurface(SDL_Surface* surface) const
+{
+	return SDL_CreateTextureFromSurface(m_renderer.get(), surface);
+}
+
+void dae::Renderer::InitImGui() const
+{
+	ImGui_ImplSDL3_InitForSDLRenderer(m_window, m_renderer.get());
+	ImGui_ImplSDLRenderer3_Init(m_renderer.get());
+}
+
+void dae::Renderer::ImGuiNewFrame() const
+{
+	ImGui_ImplSDLRenderer3_NewFrame();
+	ImGui_ImplSDL3_NewFrame();
+}
+
+void dae::Renderer::RenderImGui() const
+{
+	ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer.get());
+}
+
+void dae::Renderer::ShutDownImGui() const
+{
+	ImGui_ImplSDLRenderer3_Shutdown();
+	ImGui_ImplSDL3_Shutdown();
+}

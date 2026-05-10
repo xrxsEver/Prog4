@@ -7,7 +7,7 @@
 namespace dae
 {
     MoveCommand::MoveCommand(GameObject &actor, const glm::vec2 direction, const float /*speed*/)
-        : GameActorCommand(actor), m_direction(direction), m_speed(0.0f)
+        : GameActorCommand(actor), m_direction(direction)
     {
     }
 

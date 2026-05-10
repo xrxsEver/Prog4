@@ -36,7 +36,7 @@ namespace
     using TexturePtr = std::unique_ptr<SDL_Texture, SDLTextureDeleter>;
 }
 
-dae::TextComponent::TextComponent(GameObject *pOwner, const std::string &text, std::shared_ptr<Font> font, const SDL_Color &color)
+dae::TextComponent::TextComponent(GameObject *pOwner, const std::string &text, std::shared_ptr<Font> font, const Color &color)
     : Component(pOwner), m_text(text), m_color(color), m_font(std::move(font))
 {
 }
@@ -47,13 +47,14 @@ void dae::TextComponent::Update(float deltaTime)
 
     if (m_needsUpdate)
     {
-        SurfacePtr surf{TTF_RenderText_Blended(m_font->GetFont(), m_text.c_str(), m_text.length(), m_color)};
+        SDL_Color sdlColor = {m_color.r, m_color.g, m_color.b, m_color.a};
+        SurfacePtr surf{TTF_RenderText_Blended(m_font->GetFont(), m_text.c_str(), m_text.length(), sdlColor)};
         if (surf == nullptr)
         {
             throw std::runtime_error(std::string("Render text failed: ") + SDL_GetError());
         }
 
-        TexturePtr texture{SDL_CreateTextureFromSurface(Renderer::GetInstance().GetSDLRenderer(), surf.get())};
+        TexturePtr texture{Renderer::GetInstance().CreateTextureFromSurface(surf.get())};
         if (texture == nullptr)
         {
             throw std::runtime_error(std::string("Create text texture from surface failed: ") + SDL_GetError());
@@ -75,7 +76,7 @@ void dae::TextComponent::SetText(const std::string &text)
     m_needsUpdate = true;
 }
 
-void dae::TextComponent::SetColor(const SDL_Color &color)
+void dae::TextComponent::SetColor(const Color &color)
 {
     m_color = color;
     m_needsUpdate = true;

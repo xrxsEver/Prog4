@@ -1,4 +1,3 @@
-#include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
 #if _DEBUG && __has_include(<vld.h>)
@@ -59,7 +58,7 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	// auto font = resourceManager.LoadFont("Lingua.otf", 36);
 	// go = std::make_unique<dae::GameObject>();
 	// go->SetName("Title");
-	// go->AddComponent<dae::TextComponent>("Programming 4 Assignment", font, SDL_Color{255, 255, 0, 255});
+	// go->AddComponent<dae::TextComponent>("Programming 4 Assignment", font, dae::TextComponent::Color{255, 255, 0, 255});
 	// go->SetPosition(292, 20);
 	// go->SetParent(canvasPtr, false);
 	// scene.Add(std::move(go));
@@ -68,7 +67,7 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	auto fpsFont = resourceManager.LoadFont("Lingua.otf", 16);
 	go = std::make_unique<dae::GameObject>();
 	go->SetName("FPS Counter");
-	go->AddComponent<dae::TextComponent>("0 FPS", fpsFont, SDL_Color{255, 255, 255, 255});
+	go->AddComponent<dae::TextComponent>("0 FPS", fpsFont, dae::TextComponent::Color{255, 255, 255, 255});
 	go->AddComponent<dae::FPSComponent>();
 	go->SetPosition(500, 20);
 	go->SetParent(canvasPtr, false);
@@ -109,41 +108,41 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	}
 
 	// auto pengoLivesDisplay = std::make_unique<dae::GameObject>("Pengo Lives");
-	// pengoLivesDisplay->AddComponent<dae::TextComponent>("Pengo lives: 3", fpsFont, SDL_Color{255, 255, 255, 255});
+	// pengoLivesDisplay->AddComponent<dae::TextComponent>("Pengo lives: 3", fpsFont, dae::TextComponent::Color{255, 255, 255, 255});
 	// pengoLivesDisplay->AddComponent<dae::RemainingLivesDisplayComponent>(pengoPtr, "Pengo lives");
 	// pengoLivesDisplay->SetPosition(20, 52);
 	// pengoLivesDisplay->SetParent(canvasPtr, false);
 	// scene.Add(std::move(pengoLivesDisplay));
 	//
 	// auto snoBeeLivesDisplay = std::make_unique<dae::GameObject>("SnoBee Lives");
-	// snoBeeLivesDisplay->AddComponent<dae::TextComponent>("SnoBee lives: 3", fpsFont, SDL_Color{255, 255, 255, 255});
+	// snoBeeLivesDisplay->AddComponent<dae::TextComponent>("SnoBee lives: 3", fpsFont, dae::TextComponent::Color{255, 255, 255, 255});
 	// snoBeeLivesDisplay->AddComponent<dae::RemainingLivesDisplayComponent>(snoBeePtr, "SnoBee lives");
 	// snoBeeLivesDisplay->SetPosition(20, 84);
 	// snoBeeLivesDisplay->SetParent(canvasPtr, false);
 	// scene.Add(std::move(snoBeeLivesDisplay));
 	//
 	// auto pengoPointsDisplay = std::make_unique<dae::GameObject>("Pengo Points");
-	// pengoPointsDisplay->AddComponent<dae::TextComponent>("Pengo points: 0", fpsFont, SDL_Color{255, 255, 255, 255});
+	// pengoPointsDisplay->AddComponent<dae::TextComponent>("Pengo points: 0", fpsFont, dae::TextComponent::Color{255, 255, 255, 255});
 	// pengoPointsDisplay->AddComponent<dae::ScoreDisplayComponent>(std::vector<dae::Character *>{pengoPtr}, "Pengo points");
 	// pengoPointsDisplay->SetPosition(20, 116);
 	// pengoPointsDisplay->SetParent(canvasPtr, false);
 	// scene.Add(std::move(pengoPointsDisplay));
 	//
 	// auto snoBeePointsDisplay = std::make_unique<dae::GameObject>("SnoBee Points");
-	// snoBeePointsDisplay->AddComponent<dae::TextComponent>("SnoBee points: 0", fpsFont, SDL_Color{255, 255, 255, 255});
+	// snoBeePointsDisplay->AddComponent<dae::TextComponent>("SnoBee points: 0", fpsFont, dae::TextComponent::Color{255, 255, 255, 255});
 	// snoBeePointsDisplay->AddComponent<dae::ScoreDisplayComponent>(std::vector<dae::Character *>{snoBeePtr}, "SnoBee points");
 	// snoBeePointsDisplay->SetPosition(20, 148);
 	// snoBeePointsDisplay->SetParent(canvasPtr, false);
 	// scene.Add(std::move(snoBeePointsDisplay));
 	//
 	// auto controlsHintKeyboard = std::make_unique<dae::GameObject>("Controls Hint Keyboard");
-	// controlsHintKeyboard->AddComponent<dae::TextComponent>("Pengo :  C lose life for sound", fpsFont, SDL_Color{210, 220, 235, 255});
+	// controlsHintKeyboard->AddComponent<dae::TextComponent>("Pengo :  C lose life for sound", fpsFont, dae::TextComponent::Color{210, 220, 235, 255});
 	// controlsHintKeyboard->SetPosition(20, 200);
 	// controlsHintKeyboard->SetParent(canvasPtr, false);
 	// scene.Add(std::move(controlsHintKeyboard));
 	//
 	 auto controlsHintGamepad = std::make_unique<dae::GameObject>("Move controls");
-	 controlsHintGamepad->AddComponent<dae::TextComponent>("WASD to see pengo animations", fpsFont, SDL_Color{210, 220, 235, 255});
+	 controlsHintGamepad->AddComponent<dae::TextComponent>("WASD to see pengo animations", fpsFont, dae::TextComponent::Color{210, 220, 235, 255});
 	 controlsHintGamepad->SetPosition(500, 228);
 	 controlsHintGamepad->SetParent(canvasPtr, false);
 	 scene.Add(std::move(controlsHintGamepad));

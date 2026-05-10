@@ -148,13 +148,12 @@ void dae::Minigin::RunFrame(const float deltaTime)
 
 	auto &renderer = Renderer::GetInstance();
 	auto &imgui = ImGuiManager::GetInstance();
-	SDL_Renderer *sdlRenderer = renderer.GetSDLRenderer();
 
 	imgui.BeginFrame();
-	renderer.Render();
+	renderer.RenderClear();
 	m_sceneManager.Render();
-	imgui.EndFrame(sdlRenderer);
-	SDL_RenderPresent(sdlRenderer);
+	imgui.EndFrame();
+	renderer.RenderPresent();
 }
 
 dae::Minigin::Minigin(const std::filesystem::path &dataPath)
@@ -164,7 +163,7 @@ dae::Minigin::Minigin(const std::filesystem::path &dataPath)
 
 	Renderer::GetInstance().Init(m_pSdlRuntime->GetWindow());
 	m_resourceManager.Init(dataPath);
-	ImGuiManager::GetInstance().Init(m_pSdlRuntime->GetWindow(), Renderer::GetInstance().GetSDLRenderer(), m_sceneManager, m_inputManager);
+	ImGuiManager::GetInstance().Init(m_sceneManager, m_inputManager);
 }
 
 dae::Minigin::~Minigin()
