@@ -19,6 +19,7 @@
 #include "RemainingLivesDisplayComponent.h"
 #include "ScoreDisplayComponent.h"
 #include "SnoBeeCharacter.h"
+#include "TypeRegistry.h"
 #include "Achievements.h"
 #include "MazeDrawingComponent.h"
 
@@ -95,11 +96,12 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	pengo->BindKeyboardControls(inputManager);
 	scene.Add(std::move(pengo));
 
-	auto snoBee = std::make_unique<dae::SnoBeeCharacter>(resourceManager);
-	auto *snoBeePtr = snoBee.get();
-	snoBee->SetPosition(576, 288);
-	snoBee->BindGamepadControls(inputManager, dae::InputManager::AnyGamepad);
-	scene.Add(std::move(snoBee));
+     const dae::SnoBeeType* basicType = dae::TypeRegistry::GetInstance().GetSnoBeeType("Basic");
+	 auto snoBee = std::make_unique<dae::SnoBeeCharacter>(resourceManager, basicType);
+	 auto *snoBeePtr = snoBee.get();
+	// snoBee->SetPosition(576, 288);
+	// snoBee->BindGamepadControls(inputManager, dae::InputManager::AnyGamepad);
+	// scene.Add(std::move(snoBee));
 
 	if (dae::Achievements *achievements = dae::Achievements::GetActiveInstance(); achievements != nullptr)
 	{

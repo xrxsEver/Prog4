@@ -155,9 +155,11 @@ set(GAME_SOURCES
   Game/Commands/LoseLifeCommand.cpp
   Game/Commands/MoveCommand.cpp
   Game/Characters/Character.cpp
+  Game/Characters/BaseEnemy.cpp
   Game/Characters/PengoCharacter.cpp
   Game/Characters/PengoState.cpp
   Game/Characters/SnoBeeCharacter.cpp
+  Game/Characters/TypeRegistry.cpp
   Game/Components/AnalogStickMoveComponent.cpp
   Game/Components/FPSComponent.cpp
   Game/Components/RemainingLivesDisplayComponent.cpp

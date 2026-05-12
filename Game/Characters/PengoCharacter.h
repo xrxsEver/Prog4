@@ -78,8 +78,8 @@ namespace dae
         glm::vec3 m_targetPosition{};
         bool m_isMovingToTarget{false};
 
-        float m_animationTimer{0.0f};
-        int m_currentFrame{0};
+        // float m_animationTimer{0.0f};
+        // int m_currentFrame{0};
         int m_spriteRow{0};
         int m_spriteStartCol{0};
         bool m_isMoving{false};

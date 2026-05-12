@@ -7,6 +7,7 @@
 #include "MazeGenerator.h"
 #include "Scene.h"
 #include "SnoBeeCharacter.h"
+#include "TypeRegistry.h"
 #include <algorithm>
 #include <random>
 
@@ -86,7 +87,8 @@ namespace dae
                         for (int index : m_spawnBlockIndices)
                         {
                             auto& b = m_blocks[index];
-                            auto snoBee = std::make_unique<SnoBeeCharacter>(m_resourceManager);
+                            const SnoBeeType* basicType = TypeRegistry::GetInstance().GetSnoBeeType("Basic");
+                            auto snoBee = std::make_unique<SnoBeeCharacter>(m_resourceManager, basicType);
                             glm::vec2 screenPos = GetScreenPos(b.r, b.c);
                             snoBee->SetLocalPosition({ screenPos.x, screenPos.y, 0 });
                             m_scene.Add(std::move(snoBee));

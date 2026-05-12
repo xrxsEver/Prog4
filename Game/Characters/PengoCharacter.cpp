@@ -10,7 +10,7 @@
 namespace dae
 {
     constexpr float MOVE_SPEED = 140.0f;
-    constexpr float ANIMATION_SPEED = 0.2f;
+    // constexpr float ANIMATION_SPEED = 0.2f;
     constexpr float SPRITE_SIZE = 16.0f;
 
     // Component to bridge GameObject::Update to PengoCharacter's State Machine

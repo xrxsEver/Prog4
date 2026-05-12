@@ -2,38 +2,70 @@
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 
-#include "Character.h"
-#include "SnoBeeConfig.h"
+#include "BaseEnemy.h"
+#include "SnoBeeType.h"
 
 namespace dae
 {
     enum class EnemyState : std::uint8_t
     {
-        Idle,
-        Walking,
-        Dying
+        Hatching,
+        Wandering,
+        Chasing,
+        BreakingIce,
+        Stunned,
+        Dead
     };
 
     class InputManager;
     class ResourceManager;
     class AnalogStickMoveComponent;
 
-    class SnoBeeCharacter final : public Character
+    class SnoBeeCharacter final : public BaseEnemy
     {
     public:
-        explicit SnoBeeCharacter(ResourceManager &resourceManager);
+        explicit SnoBeeCharacter(ResourceManager &resourceManager, const SnoBeeType* type);
         ~SnoBeeCharacter() override;
 
         void BindGamepadControls(InputManager &inputManager, std::uint32_t gamepadIndex);
 
-        void ApplyConfig(const SnoBeeConfig& config);
         std::unique_ptr<SnoBeeCharacter> Clone() const;
 
-        static std::unique_ptr<SnoBeeCharacter> Spawn(const SnoBeeCharacter& prototype, const SnoBeeConfig& config);
+        static std::unique_ptr<SnoBeeCharacter> Spawn(const SnoBeeCharacter& prototype, const SnoBeeType* type);
+
+    protected:
+        void PerformAction(float dt) override;
 
     private:
-        SnoBeeConfig m_currentConfig{};
+        const SnoBeeType* m_pType{};
         AnalogStickMoveComponent* m_pMoveComponent{};
+
+        EnemyState m_currentState{EnemyState::Hatching};
+
+        // Grid movement variables
+        glm::vec2 m_currentDirection{0.0f, 1.0f};
+        glm::vec3 m_targetPosition{};
+        bool m_isMovingToTarget{false};
+
+        // Timers and logic
+        int m_thinkTimerFrames{0};
+        float m_breakIceTimer{0.0f};
+        float m_hatchingTimer{2.0f}; // 2 second spawn animation/delay
+
+        static constexpr float m_blockSize = 32.0f;
+        static constexpr int m_maxThinkFrames = 15;
+
+        void ChangeState(EnemyState nextState);
+
+        void ProcessMovement(float dt);
+        void Think();
+        void ChasePlayer();
+        void Wander();
+        void MaybeBreakIce(const glm::vec2& blockedDir);
+
+        std::vector<glm::vec2> GetValidDirections() const;
+        glm::vec2 GetRandomValidDirection(const std::vector<glm::vec2>& validDirs, const glm::vec2& preferredDir = {0.f, 0.f}) const;
     };
 }
