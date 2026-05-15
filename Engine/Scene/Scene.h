@@ -3,13 +3,17 @@
 #include <string>
 #include <vector>
 #include "GameObject.h"
+#include "SnoBeeManager.h"
 
 namespace dae
 {
+    class SnoBeeCharacter;
+
 	class Scene final
 	{
 	public:
 		void Add(std::unique_ptr<GameObject> object);
+        void AddSnoBee(SnoBeeCharacter* snoBee);
 		void Remove(const GameObject &object);
 		void RemoveAll();
 		const std::vector<std::unique_ptr<GameObject>> &GetObjects() const { return m_objects; }
@@ -18,7 +22,7 @@ namespace dae
 		void FixedUpdate();
 		void Render() const;
 
-		explicit Scene() = default;
+		explicit Scene();
 
 		~Scene() = default;
 		Scene(const Scene &other) = delete;
@@ -31,6 +35,7 @@ namespace dae
 
 		std::vector<std::unique_ptr<GameObject>> m_objects{};
 		std::vector<std::unique_ptr<GameObject>> m_objectsToAdd{};
+        std::unique_ptr<SnoBeeManager> m_snoBeeManager;
 	};
 
 }

@@ -26,10 +26,10 @@ namespace dae
 
         void Update(float /*deltaTime*/) override
         {
-            if (auto* pengo = dynamic_cast<PengoCharacter*>(GetOwner()))
-            {
-                pengo->UpdateStateMachine();
-            }
+            auto* pengo = dynamic_cast<PengoCharacter*>(GetOwner());
+            if (!pengo) return;
+
+            pengo->UpdateStateMachine();
         }
     };
 
@@ -109,18 +109,15 @@ namespace dae
 
     void PengoCharacter::UpdateRenderComponent()
     {
-        if (m_pRenderComponent)
-        {
-            if (m_animationFrame != -1)
-            {
-                m_pRenderComponent->SetSourceRect(
-                    m_animationFrame * SPRITE_SIZE,
-                    0,
-                    SPRITE_SIZE,
-                    SPRITE_SIZE
-                );
-            }
-        }
+        if (!m_pRenderComponent) return;
+        if (m_animationFrame == -1) return;
+
+        m_pRenderComponent->SetSourceRect(
+            m_animationFrame * SPRITE_SIZE,
+            0,
+            SPRITE_SIZE,
+            SPRITE_SIZE
+        );
     }
 
     void PengoCharacter::ApplyStateSwap() {}
@@ -167,26 +164,26 @@ namespace dae
             {
                 SetLocalPosition(currentPos + glm::normalize(toTarget) * moveDist);
             }
+            return; // Early return since we are already moving to a target
         }
 
-        if (!m_isMovingToTarget && !m_activeMoveInputs.empty())
+        if (m_activeMoveInputs.empty()) return;
+
+        PengoDirection nextDir = m_activeMoveInputs.back();
+        m_currentDirection = nextDir;
+
+        glm::vec3 currentPos = GetLocalPosition();
+        glm::vec3 directionVec{0, 0, 0};
+
+        switch (nextDir)
         {
-            PengoDirection nextDir = m_activeMoveInputs.back();
-            m_currentDirection = nextDir;
-
-            glm::vec3 currentPos = GetLocalPosition();
-            glm::vec3 directionVec{0, 0, 0};
-
-            switch (nextDir)
-            {
-            case PengoDirection::Up:    directionVec.y = -1; break;
-            case PengoDirection::Down:  directionVec.y = 1;  break;
-            case PengoDirection::Left:  directionVec.x = -1; break;
-            case PengoDirection::Right: directionVec.x = 1;  break;
-            }
-
-            m_targetPosition = currentPos + directionVec * m_blockSize;
-            m_isMovingToTarget = true;
+        case PengoDirection::Up:    directionVec.y = -1; break;
+        case PengoDirection::Down:  directionVec.y = 1;  break;
+        case PengoDirection::Left:  directionVec.x = -1; break;
+        case PengoDirection::Right: directionVec.x = 1;  break;
         }
+
+        m_targetPosition = currentPos + directionVec * m_blockSize;
+        m_isMovingToTarget = true;
     }
 }

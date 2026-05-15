@@ -28,10 +28,9 @@ namespace dae
 
         void Update(float deltaTime) override
         {
-            if (auto* enemy = dynamic_cast<BaseEnemy*>(GetOwner()))
-            {
-                enemy->UpdateFromComponent(deltaTime);
-            }
+            auto* enemy = dynamic_cast<BaseEnemy*>(GetOwner());
+            if (!enemy) return;
+            enemy->UpdateFromComponent(deltaTime);
         }
     };
 }
@@ -54,10 +53,12 @@ namespace
         std::uniform_real_distribution<float> dis(0.0f, 1.0f);
         return dis(gen) < probability;
     }
+
+    int g_SnoBeeCounter = 0;
 }
 
 dae::SnoBeeCharacter::SnoBeeCharacter(ResourceManager &resourceManager, const SnoBeeType* type)
-    : BaseEnemy("SnoBee", resourceManager), m_pType(type)
+    : BaseEnemy("SnoBee " + std::to_string(++g_SnoBeeCounter), resourceManager), m_pType(type)
 {
     InitializeSprite(8 * 16.0f, 9 * 16.0f);
     ChangeState(EnemyState::Hatching);
@@ -83,65 +84,54 @@ void dae::SnoBeeCharacter::PerformAction(float dt)
         ChangeState(EnemyState::Dead);
     }
 
-    switch (m_currentState)
+    if (m_currentState == EnemyState::Hatching)
     {
-    case EnemyState::Hatching:
         m_hatchingTimer -= dt;
         if (m_hatchingTimer <= 0.0f)
         {
             ChangeState(EnemyState::Wandering);
         }
-        break;
+        return;
+    }
 
-    case EnemyState::Wandering:
-    case EnemyState::Chasing:
+    if (m_currentState == EnemyState::Wandering || m_currentState == EnemyState::Chasing)
+    {
         ProcessMovement(dt);
 
-        if (!m_isMovingToTarget) // At tile center
+        if (m_isMovingToTarget) return;
+
+        if (m_thinkTimerFrames <= 0)
         {
-            if (m_thinkTimerFrames <= 0)
-            {
-                Think();
-                m_thinkTimerFrames = m_maxThinkFrames;
-            }
-            else
-            {
-                m_thinkTimerFrames--;
-
-                // If we didn't think, just keep moving in the same direction if possible
-                if (IsTileWalkable(m_currentDirection))
-                {
-                    m_targetPosition = GetLocalPosition() + glm::vec3(m_currentDirection.x, m_currentDirection.y, 0.0f) * m_blockSize;
-                    m_isMovingToTarget = true;
-                }
-                else
-                {
-                    // Force a think if blocked
-                    Think();
-                    m_thinkTimerFrames = m_maxThinkFrames;
-                }
-            }
+            Think();
+            m_thinkTimerFrames = m_maxThinkFrames;
+            return;
         }
-        break;
 
-    case EnemyState::BreakingIce:
+        m_thinkTimerFrames--;
+
+        if (IsTileWalkable(m_currentDirection))
+        {
+            m_targetPosition = GetLocalPosition() + glm::vec3(m_currentDirection.x, m_currentDirection.y, 0.0f) * m_blockSize;
+            m_isMovingToTarget = true;
+            return;
+        }
+
+        Think();
+        m_thinkTimerFrames = m_maxThinkFrames;
+        return;
+    }
+
+    if (m_currentState == EnemyState::BreakingIce)
+    {
         m_breakIceTimer -= dt;
         if (m_breakIceTimer <= 0.0f)
         {
             BreakBlockInDirection(m_currentDirection);
-            ChangeState(EnemyState::Chasing); // resume chase/wander
+            ChangeState(EnemyState::Chasing);
             m_targetPosition = GetLocalPosition() + glm::vec3(m_currentDirection.x, m_currentDirection.y, 0.0f) * m_blockSize;
             m_isMovingToTarget = true;
         }
-        break;
-
-    case EnemyState::Stunned:
-        // Handle stun timer...
-        break;
-
-    case EnemyState::Dead:
-        // Handle death animation, remove from scene...
-        break;
+        return;
     }
 }
 
@@ -159,11 +149,10 @@ void dae::SnoBeeCharacter::ProcessMovement(float dt)
     {
         SetLocalPosition(m_targetPosition);
         m_isMovingToTarget = false;
+        return; // Early return
     }
-    else
-    {
-        SetLocalPosition(currentPos + glm::normalize(toTarget) * moveDist);
-    }
+
+    SetLocalPosition(currentPos + glm::normalize(toTarget) * moveDist);
 }
 
 void dae::SnoBeeCharacter::Think()
@@ -198,51 +187,46 @@ void dae::SnoBeeCharacter::ChasePlayer()
     float dx = playerPos.x - myPos.x;
     float dy = playerPos.y - myPos.y;
 
-    glm::vec2 primaryDir{0.f};
-    glm::vec2 secondaryDir{0.f};
-
-    if (std::abs(dx) > std::abs(dy))
-    {
-        primaryDir = glm::vec2(dx > 0 ? 1.0f : -1.0f, 0.0f);
-        secondaryDir = glm::vec2(0.0f, dy > 0 ? 1.0f : -1.0f);
-    }
-    else
-    {
-        primaryDir = glm::vec2(0.0f, dy > 0 ? 1.0f : -1.0f);
-        secondaryDir = glm::vec2(dx > 0 ? 1.0f : -1.0f, 0.0f);
-    }
-
     // 10-25% randomness
     if (GetRandomChance(0.15f))
     {
-        std::vector<glm::vec2> validDirs = GetValidDirections();
-        m_currentDirection = GetRandomValidDirection(validDirs);
+        m_currentDirection = GetRandomValidDirection(GetValidDirections());
         return;
     }
+
+    glm::vec2 primaryDir = (std::abs(dx) > std::abs(dy))
+        ? glm::vec2(dx > 0 ? 1.0f : -1.0f, 0.0f)
+        : glm::vec2(0.0f, dy > 0 ? 1.0f : -1.0f);
+
+    glm::vec2 secondaryDir = (std::abs(dx) > std::abs(dy))
+        ? glm::vec2(0.0f, dy > 0 ? 1.0f : -1.0f)
+        : glm::vec2(dx > 0 ? 1.0f : -1.0f, 0.0f);
 
     if (IsTileWalkable(primaryDir))
     {
         m_currentDirection = primaryDir;
+        return;
     }
-    else if (IsTileIce(primaryDir) && m_pType && m_pType->isAggressive)
+
+    if (IsTileIce(primaryDir) && m_pType && m_pType->isAggressive)
     {
         MaybeBreakIce(primaryDir);
         if (m_currentState == EnemyState::BreakingIce) return;
     }
-    else if (IsTileWalkable(secondaryDir))
+
+    if (IsTileWalkable(secondaryDir))
     {
         m_currentDirection = secondaryDir;
+        return;
     }
-    else if (IsTileIce(secondaryDir) && m_pType && m_pType->isAggressive)
+
+    if (IsTileIce(secondaryDir) && m_pType && m_pType->isAggressive)
     {
         MaybeBreakIce(secondaryDir);
         if (m_currentState == EnemyState::BreakingIce) return;
     }
-    else
-    {
-        std::vector<glm::vec2> validDirs = GetValidDirections();
-        m_currentDirection = GetRandomValidDirection(validDirs, primaryDir);
-    }
+
+    m_currentDirection = GetRandomValidDirection(GetValidDirections(), primaryDir);
 }
 
 void dae::SnoBeeCharacter::Wander()

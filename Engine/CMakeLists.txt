@@ -12,6 +12,7 @@ add_library(minigin_engine STATIC
   Rendering/Texture2D.cpp
   Scene/Scene.cpp
   Scene/SceneManager.cpp
+  Scene/SnoBeeManager.cpp
   UI/CacheBenchmarkWindow.cpp
   UI/ImGuiManager.cpp
   Events/Subject.cpp

@@ -4,7 +4,16 @@
 #include <algorithm>
 
 dae::GameObject::GameObject(std::string name)
-	: m_name(std::move(name))
+	: m_localPosition(0.0f, 0.0f, 0.0f)
+	, m_localRotation(0.0f, 0.0f, 0.0f)
+	, m_localScale(1.0f, 1.0f, 1.0f)
+	, m_transform()
+	, m_isDirty(true)
+	, m_pParent(nullptr)
+	, m_children()
+	, m_components()
+	, m_name(std::move(name))
+	, m_isMarkedForDelete(false)
 {
 }
 
@@ -20,7 +29,7 @@ dae::GameObject::~GameObject()
 	for (auto *child : m_children)
 	{
 		child->m_pParent = nullptr;
-		child->SetPositionDirty();
+		child->SetDirty();
 	}
 	m_children.clear();
 }
@@ -53,18 +62,30 @@ void dae::GameObject::Render() const
 void dae::GameObject::SetPosition(float x, float y)
 {
 	m_localPosition = {x, y, 0.0f};
-	SetPositionDirty();
+	SetDirty();
 }
 
 void dae::GameObject::SetLocalPosition(const glm::vec3 &pos)
 {
 	m_localPosition = pos;
-	SetPositionDirty();
+	SetDirty();
+}
+
+void dae::GameObject::SetLocalRotation(const glm::vec3 &rot)
+{
+	m_localRotation = rot;
+	SetDirty();
+}
+
+void dae::GameObject::SetLocalScale(const glm::vec3 &scale)
+{
+	m_localScale = scale;
+	SetDirty();
 }
 
 const glm::vec3 &dae::GameObject::GetWorldPosition()
 {
-	UpdateWorldPosition();
+	UpdateWorldTransform();
 	return m_transform.position;
 }
 
@@ -125,7 +146,7 @@ void dae::GameObject::SetParent(GameObject *parent, bool keepWorldPosition)
 	{
 		m_pParent->AddChild(this);
 	}
-	SetPositionDirty();
+	SetDirty();
 }
 
 // --- helpers ---
@@ -144,40 +165,48 @@ void dae::GameObject::RemoveChild(GameObject *child)
 
 dae::Transform &dae::GameObject::GetTransform()
 {
-	UpdateWorldPosition();
+	UpdateWorldTransform();
 	return m_transform;
 }
 
 const dae::Transform &dae::GameObject::GetTransform() const
 {
-	UpdateWorldPosition();
+	UpdateWorldTransform();
 	return m_transform;
 }
 
-void dae::GameObject::SetPositionDirty()
+void dae::GameObject::SetDirty()
 {
-	m_isPositionDirty = true;
+	m_isDirty = true;
 
 	for (auto *child : m_children)
 	{
-		child->SetPositionDirty();
+		child->SetDirty();
 	}
 }
 
-void dae::GameObject::UpdateWorldPosition() const
+void dae::GameObject::UpdateWorldTransform() const
 {
-	if (!m_isPositionDirty)
+	if (!m_isDirty)
 	{
 		return;
 	}
 
-	glm::vec3 worldPosition = m_localPosition;
 	if (m_pParent != nullptr)
 	{
-		worldPosition += m_pParent->GetTransform().position;
+		const auto& parentTransform = m_pParent->GetTransform();
+		m_transform.position = parentTransform.position + m_localPosition;
+		m_transform.rotation = parentTransform.rotation + m_localRotation;
+		m_transform.scale = parentTransform.scale * m_localScale;
 	}
-	m_transform.position = worldPosition;
-	m_isPositionDirty = false;
+	else
+	{
+		m_transform.position = m_localPosition;
+		m_transform.rotation = m_localRotation;
+		m_transform.scale = m_localScale;
+	}
+
+	m_isDirty = false;
 }
 
 bool dae::GameObject::IsChild(const GameObject *object) const

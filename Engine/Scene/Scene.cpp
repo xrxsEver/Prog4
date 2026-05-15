@@ -1,12 +1,24 @@
 #include <algorithm>
+#include <cassert>
 #include "Scene.h"
+#include "../../Game/Characters/SnoBeeCharacter.h"
 
 using namespace dae;
+
+Scene::Scene()
+    : m_snoBeeManager(std::make_unique<SnoBeeManager>())
+{
+}
 
 void Scene::Add(std::unique_ptr<GameObject> object)
 {
 	assert(object != nullptr && "Cannot add a null GameObject to the scene.");
 	m_objectsToAdd.emplace_back(std::move(object));
+}
+
+void Scene::AddSnoBee(SnoBeeCharacter* snoBee)
+{
+    m_snoBeeManager->AddSnoBee(snoBee);
 }
 
 void Scene::Remove(const GameObject &object)
@@ -36,9 +48,14 @@ void Scene::Update(float deltaTime)
 		m_objectsToAdd.clear();
 	}
 
+    m_snoBeeManager->Update(deltaTime);
+
 	for (auto &object : m_objects)
 	{
-		object->Update(deltaTime);
+        if (dynamic_cast<SnoBeeCharacter*>(object.get()) == nullptr)
+        {
+		    object->Update(deltaTime);
+        }
 	}
 
 	m_objects.erase(

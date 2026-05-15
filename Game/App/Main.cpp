@@ -71,14 +71,9 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 
 	scene.Add(std::move(pengo));
 
-     const dae::SnoBeeType* basicType = dae::TypeRegistry::GetInstance().GetSnoBeeType("Basic");
-	 auto snoBee = std::make_unique<dae::SnoBeeCharacter>(resourceManager, basicType);
-	 auto *snoBeePtr = snoBee.get();
-
 	if (dae::Achievements *achievements = dae::Achievements::GetActiveInstance(); achievements != nullptr)
 	{
 		achievements->ObserveCharacter(pengoPtr);
-		achievements->ObserveCharacter(snoBeePtr);
 	}
 
 }

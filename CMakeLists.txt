@@ -175,7 +175,6 @@ set(GAME_SOURCES
   Game/Components/AnalogStickMoveComponent.cpp
   Game/Components/FPSComponent.cpp
   Game/Components/RemainingLivesDisplayComponent.cpp
-  Game/Components/RotationComponent.cpp
   Game/Components/ScoreDisplayComponent.cpp
   Game/Components/MazeDrawingComponent.cpp
 )

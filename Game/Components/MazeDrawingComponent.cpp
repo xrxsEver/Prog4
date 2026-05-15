@@ -91,6 +91,8 @@ namespace dae
                             // Offset sno bee visual spawns as requested
                             const glm::vec2 screenPos = GetScreenPos(b.r - 1, b.c - 1);
                             snoBee->SetLocalPosition({ screenPos.x, screenPos.y, 0 });
+                            
+                            m_scene.AddSnoBee(snoBee.get());
                             m_scene.Add(std::move(snoBee));
                             
                             b.removed = true;
