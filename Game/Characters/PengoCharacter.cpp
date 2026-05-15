@@ -39,6 +39,8 @@ namespace dae
           m_previousPosition(GetLocalPosition()),
           m_pRenderComponent(nullptr)
     {
+        SetLocalPosition({-1000.f, -1000.f, 0.f});
+
         InitializeSprite(0.f, 0.f);
 
         m_pRenderComponent = GetComponent<RenderComponent>();

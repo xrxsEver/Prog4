@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <string>
 
 namespace dae
 {
@@ -8,13 +9,6 @@ namespace dae
         WALL,  // Indestructible outer border
         ICE,   // Destructible blocks
         EMPTY  // Walkable path
-    };
-
-    struct MazeConfig
-    {
-        int rows{ 15 };
-        int cols{ 13 };
-        float emptyDensity{ 0.4f }; // 40% EMPTY
     };
 
     class MazeGenerator final
@@ -27,12 +21,13 @@ namespace dae
         {
             std::vector<std::vector<TileType>> grid;
             std::vector<std::pair<int, int>> carvingSequence; // Order in which tiles were made EMPTY
+            std::pair<int, int> pengoSpawn{0, 0};
+            int rows{0};
+            int cols{0};
         };
 
-        GenerationResult Generate(const MazeConfig& config);
+        GenerationResult LoadFromFile(const std::string& filepath);
 
     private:
-        bool IsInside(int r, int c, int rows, int cols) const;
-        bool IsSpawnPoint(int r, int c, int rows, int cols) const;
     };
 }

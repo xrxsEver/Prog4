@@ -4,6 +4,7 @@
 #include <functional>
 #include <glm/vec2.hpp>
 #include <vector>
+#include <string>
 #include "MazeGenerator.h"
 
 namespace dae
@@ -36,7 +37,7 @@ namespace dae
         // Expose full maze view globally for debugging
         static bool g_ShowFullMaze;
 
-        MazeDrawingComponent(GameObject* owner, Scene& scene, ResourceManager& resourceManager, std::function<void()> onFinished);
+        MazeDrawingComponent(GameObject* owner, Scene& scene, ResourceManager& resourceManager, const std::string& levelFile, std::function<void(glm::vec2)> onFinished);
         ~MazeDrawingComponent() override = default;
 
         void Update(float deltaTime) override;
@@ -57,7 +58,9 @@ namespace dae
         
         std::vector<MazeBlock> m_blocks{};
         std::vector<int> m_removalOrder{};
-        std::function<void()> m_onFinished{};
+        std::function<void(glm::vec2)> m_onFinished{};
+        std::string m_levelFile;
+        glm::vec2 m_pengoSpawnPos{0, 0};
 
         int m_rows = 15;
         int m_cols = 13;

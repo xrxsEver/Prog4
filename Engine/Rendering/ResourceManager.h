@@ -18,6 +18,7 @@ namespace dae
 		void ShutDown();
 		std::shared_ptr<Texture2D> LoadTexture(std::string_view file);
 		std::shared_ptr<Font> LoadFont(std::string_view file, uint8_t size);
+		std::string GetDataPath() const { return m_dataPath.string(); }
 
 	private:
 		std::filesystem::path m_dataPath;

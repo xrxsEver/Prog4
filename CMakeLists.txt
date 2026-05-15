@@ -28,6 +28,18 @@ if(NOT glm_FOUND)
   FetchContent_MakeAvailable(glm)
 endif()
 
+# add nlohmann_json
+find_package(nlohmann_json CONFIG QUIET)
+if(NOT nlohmann_json_FOUND)
+  FetchContent_Declare(
+    nlohmann_json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    DOWNLOAD_NO_PROGRESS ON
+    DOWNLOAD_DIR ${CMAKE_BINARY_DIR}/downloads
+  )
+  FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
 # Add SDL3
 find_package(SDL3 3.4 CONFIG QUIET)
 if(NOT SDL3_FOUND)
@@ -192,6 +204,7 @@ target_include_directories("${TARGET_NAME}" PUBLIC
 # Link against engine library and external dependencies
 target_link_libraries("${TARGET_NAME}" PUBLIC
   minigin_engine
+  nlohmann_json::nlohmann_json
 )
 
 # Add Steamworks support if available
@@ -266,6 +279,7 @@ elseif(WIN32)
     )
   endif()
 
+  # Always copy Data folder to output directory to ensure it is up-to-date
   add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/Data" "$<TARGET_FILE_DIR:${TARGET_NAME}>/Data"
   )

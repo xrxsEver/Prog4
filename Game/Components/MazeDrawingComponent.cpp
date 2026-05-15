@@ -15,24 +15,25 @@ namespace dae
 {
     bool MazeDrawingComponent::g_ShowFullMaze = false;
 
-    MazeDrawingComponent::MazeDrawingComponent(GameObject* owner, Scene& scene, ResourceManager& resourceManager, std::function<void()> onFinished)
+    MazeDrawingComponent::MazeDrawingComponent(GameObject* owner, Scene& scene, ResourceManager& resourceManager, const std::string& levelFile, std::function<void(glm::vec2)> onFinished)
         : Component(owner)
         , m_scene(scene)
         , m_resourceManager(resourceManager)
         , m_onFinished(onFinished)
+        , m_levelFile(levelFile)
     {
         m_backgroundTexture = m_resourceManager.LoadTexture("Playfield.png");
         m_iceBlockTexture = m_resourceManager.LoadTexture("iceblock.png");
         m_miscTexture = m_resourceManager.LoadTexture("misc.png");
         m_pengoTexture = m_resourceManager.LoadTexture("pengo.png");
 
-        // Generate the maze
         MazeGenerator generator;
-        MazeConfig config;
-        config.rows = m_rows;
-        config.cols = m_cols;
-        config.emptyDensity = 0.4f;
-        auto result = generator.Generate(config);
+        const auto result = generator.LoadFromFile(m_resourceManager.GetDataPath() + levelFile);
+
+        m_rows = result.rows;
+        m_cols = result.cols;
+
+        m_pengoSpawnPos = GetScreenPos(result.pengoSpawn.first - 1, result.pengoSpawn.second - 1);
 
         // Initialize grid
         m_blocks.reserve(m_rows * m_cols);
@@ -40,9 +41,7 @@ namespace dae
         {
             for (int c = 0; c < m_cols; ++c)
             {
-                // All tiles start as ICE (or WALL if border)
-                // In Pengo, the "drawing" reveals the maze paths by removing ice blocks.
-                m_blocks.push_back({ r, c, false, result.grid[r][c], false, 0, 0.0f });
+                m_blocks.push_back(MazeBlock{ r, c, false, result.grid[r][c], false, 0, 0.0f });
             }
         }
 
@@ -50,7 +49,7 @@ namespace dae
         for (const auto& pos : result.carvingSequence)
         {
             // Find index of block at pos
-            int index = pos.first * m_cols + pos.second;
+            const int index = pos.first * m_cols + pos.second;
             m_removalOrder.push_back(index);
         }
     }
@@ -62,7 +61,7 @@ namespace dae
             if (m_spawnStep == SpawnStep::None) return;
 
             m_spawnAnimationTimer += deltaTime;
-            float currentFrameTime = (m_spawnStep == SpawnStep::SnoBeeSpawning) ? SNOBEE_SPAWN_FRAME_TIME : SPAWN_FRAME_TIME;
+            const float currentFrameTime = (m_spawnStep == SpawnStep::SnoBeeSpawning) ? SNOBEE_SPAWN_FRAME_TIME : SPAWN_FRAME_TIME;
 
             if (m_spawnAnimationTimer >= currentFrameTime)
             {
@@ -84,12 +83,13 @@ namespace dae
                         m_spawnStep = SpawnStep::Finished;
                         
                         // Actually spawn them
-                        for (int index : m_spawnBlockIndices)
+                        for (const int index : m_spawnBlockIndices)
                         {
                             auto& b = m_blocks[index];
                             const SnoBeeType* basicType = TypeRegistry::GetInstance().GetSnoBeeType("Basic");
                             auto snoBee = std::make_unique<SnoBeeCharacter>(m_resourceManager, basicType);
-                            glm::vec2 screenPos = GetScreenPos(b.r, b.c);
+                            // Offset sno bee visual spawns as requested
+                            const glm::vec2 screenPos = GetScreenPos(b.r - 1, b.c - 1);
                             snoBee->SetLocalPosition({ screenPos.x, screenPos.y, 0 });
                             m_scene.Add(std::move(snoBee));
                             
@@ -97,7 +97,7 @@ namespace dae
                             b.isSpawning = false;
                         }
                         
-                        if (m_onFinished) m_onFinished();
+                        if (m_onFinished) m_onFinished(m_pengoSpawnPos);
                         m_spawnStep = SpawnStep::None;
                     }
                 }
@@ -109,9 +109,9 @@ namespace dae
         if (m_timer >= m_blockRemoveInterval)
         {
             m_timer = 0.0f;
-            if (m_removedStep < (int)m_removalOrder.size())
+            if (m_removedStep < static_cast<int>(m_removalOrder.size()))
             {
-                int index = m_removalOrder[m_removedStep];
+                const int index = m_removalOrder[m_removedStep];
                 m_blocks[index].removed = true;
                 m_removedStep++;
             }
@@ -124,7 +124,7 @@ namespace dae
                 
                 // Pick 3 random remaining ice blocks
                 std::vector<int> iceBlockIndices;
-                for (int i = 0; i < (int)m_blocks.size(); ++i)
+                for (int i = 0; i < static_cast<int>(m_blocks.size()); ++i)
                 {
                     if (!m_blocks[i].removed && m_blocks[i].type == TileType::ICE)
                     {
@@ -149,7 +149,7 @@ namespace dae
                 }
                 else
                 {
-                    if (m_onFinished) m_onFinished();
+                    if (m_onFinished) m_onFinished(m_pengoSpawnPos);
                 }
             }
         }
@@ -161,26 +161,19 @@ namespace dae
         const auto& worldPos = GetOwner()->GetWorldPosition();
 
         // Render background
-        Rect srcBackground = { 0.0f, 0.0f, 224.0f, 256.0f };
-        float scale = m_blockSize / 16.0f;
-        float bgWidth = 224.0f * scale;
-        float bgHeight = 256.0f * scale;
+        const Rect srcBackground = { 0.0f, 0.0f, 224.0f, 256.0f };
+        const float scale = m_blockSize / 16.0f;
+        const float bgWidth = 224.0f * scale;
+        const float bgHeight = 256.0f * scale;
         renderer.RenderTexture(*m_backgroundTexture, srcBackground, worldPos.x, worldPos.y, bgWidth, bgHeight);
 
-        // Render Grid Tiles (Blocks)
-        // The ice block texture is 16x16
-        Rect srcRect = { 0.0f, 0.0f, 16.0f, 16.0f };
-
-        // This loop separates Logical Grid (r, c) from Screen Rendering (pixels)
+        const Rect srcRect = { 0.0f, 0.0f, 16.0f, 16.0f };
         for (const auto& b : m_blocks)
         {
-            // Visibility Check: Skip removed blocks unless debug is on
             if (!g_ShowFullMaze && b.removed) continue;
-
-            // Separation of Logical Grid Coordinates from Screen Rendering Coordinates
-            glm::vec2 screenPos = GetScreenPos(b.r, b.c);
-            float dstX = worldPos.x + screenPos.x;
-            float dstY = worldPos.y + screenPos.y;
+            const glm::vec2 screenPos = GetScreenPos(b.r - 1, b.c - 1);
+            const float dstX = worldPos.x + screenPos.x;
+            const float dstY = worldPos.y + screenPos.y;
 
             if (b.isSpawning)
             {
@@ -199,9 +192,8 @@ namespace dae
                     renderer.RenderTexture(*m_pengoTexture, animSrc, dstX, dstY, m_blockSize, m_blockSize);
                 }
             }
-            else
+            else if (b.type != TileType::WALL)
             {
-                // Actual Render Call
                 renderer.RenderTexture(*m_iceBlockTexture, srcRect, dstX, dstY, m_blockSize, m_blockSize);
             }
         }
@@ -211,14 +203,14 @@ namespace dae
     {
         // Simple linear transformation from grid to screen pixels
         // m_offsetX and m_offsetY handle the "pushing down and centering"
-        float x = m_offsetX + c * m_blockSize;
-        float y = m_offsetY + r * m_blockSize;
+        const float x = m_offsetX + c * m_blockSize;
+        const float y = m_offsetY + r * m_blockSize;
         return { x, y };
     }
 
     std::unique_ptr<Component> MazeDrawingComponent::Clone(GameObject* pOwner) const
     {
-        auto clone = std::make_unique<MazeDrawingComponent>(pOwner, m_scene, m_resourceManager, m_onFinished);
+        auto clone = std::make_unique<MazeDrawingComponent>(pOwner, m_scene, m_resourceManager, m_levelFile, m_onFinished);
         clone->m_blocks = m_blocks;
         clone->m_removalOrder = m_removalOrder;
         clone->m_isFinished = m_isFinished;
