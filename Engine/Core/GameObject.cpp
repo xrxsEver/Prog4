@@ -83,7 +83,7 @@ void dae::GameObject::SetLocalScale(const glm::vec3 &scale)
 	SetDirty();
 }
 
-const glm::vec3 &dae::GameObject::GetWorldPosition()
+const glm::vec3 &dae::GameObject::GetWorldPosition() const
 {
 	UpdateWorldTransform();
 	return m_transform.position;

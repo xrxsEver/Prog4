@@ -2,6 +2,8 @@
 #include <cassert>
 #include "Scene.h"
 #include "../../Game/Characters/SnoBeeCharacter.h"
+#include "../../Game/Systems/CollisionGrid.h"
+#include "../../Engine/Audio/ServiceLocator.h"
 
 using namespace dae;
 
@@ -81,4 +83,6 @@ void Scene::Render() const
 	{
 		object->Render();
 	}
+
+    ServiceLocator::get_collision_grid().Render();
 }

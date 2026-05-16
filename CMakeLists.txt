@@ -162,7 +162,10 @@ add_subdirectory(Engine)
 set(GAME_SOURCES
   Game/App/Main.cpp
   Game/Systems/Achievements.cpp
+  Game/Systems/CollisionGrid.cpp
   Game/Systems/MazeGenerator.cpp
+  Game/Systems/IceBlockPool.cpp
+  Game/Systems/GameDebugUI.cpp
   Game/Commands/AddScoreCommand.cpp
   Game/Commands/LoseLifeCommand.cpp
   Game/Commands/MoveCommand.cpp
@@ -171,6 +174,7 @@ set(GAME_SOURCES
   Game/Characters/PengoCharacter.cpp
   Game/Characters/PengoState.cpp
   Game/Characters/SnoBeeCharacter.cpp
+  Game/Characters/IceBlock.cpp
   Game/Characters/TypeRegistry.cpp
   Game/Components/AnalogStickMoveComponent.cpp
   Game/Components/FPSComponent.cpp

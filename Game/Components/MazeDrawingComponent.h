@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include "MazeGenerator.h"
+#include "IceBlockPool.h"
 
 namespace dae
 {
@@ -21,6 +22,7 @@ namespace dae
         bool isSpawning;
         int spawnAnimationFrame;
         float spawnTimer;
+        IceBlock* pPooledBlock = nullptr;
     };
 
     enum class SpawnStep
@@ -62,11 +64,11 @@ namespace dae
         std::string m_levelFile;
         glm::vec2 m_pengoSpawnPos{0, 0};
 
-        int m_rows = 15;
-        int m_cols = 13;
+        int m_rows = 17;
+        int m_cols = 15;
         float m_blockSize = 32.0f;
-        float m_offsetX = 16.0f;
-        float m_offsetY = 16.0f;
+        float m_offsetX = 0.0f;
+        float m_offsetY = 0.0f;
 
         bool m_isFinished = false;
         float m_timer = 0.0f;
@@ -77,6 +79,8 @@ namespace dae
         std::vector<int> m_spawnBlockIndices{};
         float m_spawnAnimationTimer = 0.0f;
         int m_spawnAnimationFrame = 0;
+
+        std::unique_ptr<IceBlockPool> m_pIceBlockPool;
         
         static constexpr float SPAWN_FRAME_TIME = 0.1f;
         static constexpr float SNOBEE_SPAWN_FRAME_TIME = 0.2f;

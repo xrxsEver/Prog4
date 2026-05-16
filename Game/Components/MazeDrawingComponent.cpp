@@ -8,6 +8,7 @@
 #include "Scene.h"
 #include "SnoBeeCharacter.h"
 #include "TypeRegistry.h"
+#include "CollisionGrid.h"
 #include <algorithm>
 #include <random>
 
@@ -27,13 +28,20 @@ namespace dae
         m_miscTexture = m_resourceManager.LoadTexture("misc.png");
         m_pengoTexture = m_resourceManager.LoadTexture("pengo.png");
 
+        m_pIceBlockPool = std::make_unique<IceBlockPool>(scene, resourceManager);
+
         MazeGenerator generator;
         const auto result = generator.LoadFromFile(m_resourceManager.GetDataPath() + levelFile);
 
         m_rows = result.rows;
         m_cols = result.cols;
 
-        m_pengoSpawnPos = GetScreenPos(result.pengoSpawn.first - 1, result.pengoSpawn.second - 1);
+        m_pengoSpawnPos = GetScreenPos(result.pengoSpawn.first, result.pengoSpawn.second);
+
+        m_offsetX = 0.0f;
+        m_offsetY = 0.0f;
+
+        ServiceLocator::get_collision_grid().SetRenderOffset(m_offsetX + m_blockSize, m_offsetY + m_blockSize);
 
         // Initialize grid
         m_blocks.reserve(m_rows * m_cols);
@@ -41,7 +49,18 @@ namespace dae
         {
             for (int c = 0; c < m_cols; ++c)
             {
-                m_blocks.push_back(MazeBlock{ r, c, false, result.grid[r][c], false, 0, 0.0f });
+                IceBlock* pBlock = nullptr;
+                // Only acquire ice blocks for non-WALL tiles
+                if (result.grid[r][c] != TileType::WALL)
+                {
+                    pBlock = m_pIceBlockPool->Acquire();
+                    if (pBlock)
+                    {
+                        const glm::vec2 screenPos = GetScreenPos(r, c);
+                        pBlock->SetPosition(screenPos.x, screenPos.y);
+                    }
+                }
+                m_blocks.push_back(MazeBlock{ r, c, false, result.grid[r][c], false, 0, 0.0f, pBlock });
             }
         }
 
@@ -89,7 +108,7 @@ namespace dae
                             const SnoBeeType* basicType = TypeRegistry::GetInstance().GetSnoBeeType("Basic");
                             auto snoBee = std::make_unique<SnoBeeCharacter>(m_resourceManager, basicType);
                             // Offset sno bee visual spawns as requested
-                            const glm::vec2 screenPos = GetScreenPos(b.r - 1, b.c - 1);
+                            const glm::vec2 screenPos = GetScreenPos(b.r, b.c);
                             snoBee->SetLocalPosition({ screenPos.x, screenPos.y, 0 });
                             
                             m_scene.AddSnoBee(snoBee.get());
@@ -114,7 +133,15 @@ namespace dae
             if (m_removedStep < static_cast<int>(m_removalOrder.size()))
             {
                 const int index = m_removalOrder[m_removedStep];
-                m_blocks[index].removed = true;
+                auto& b = m_blocks[index];
+                b.removed = true;
+                
+                if (b.pPooledBlock)
+                {
+                    m_pIceBlockPool->Release(b.pPooledBlock);
+                    b.pPooledBlock = nullptr;
+                }
+                
                 m_removedStep++;
             }
             else
@@ -142,8 +169,15 @@ namespace dae
                     
                     for (int i = 0; i < 3; ++i)
                     {
-                        m_spawnBlockIndices.push_back(iceBlockIndices[i]);
-                        m_blocks[iceBlockIndices[i]].isSpawning = true;
+                        const int index = iceBlockIndices[i];
+                        m_spawnBlockIndices.push_back(index);
+                        auto& b = m_blocks[index];
+                        b.isSpawning = true;
+                        if (b.pPooledBlock)
+                        {
+                            m_pIceBlockPool->Release(b.pPooledBlock);
+                            b.pPooledBlock = nullptr;
+                        }
                     }
                     m_spawnStep = SpawnStep::IceBreaking;
                     m_spawnAnimationFrame = 0;
@@ -155,6 +189,8 @@ namespace dae
                 }
             }
         }
+
+        m_pIceBlockPool->Update(deltaTime);
     }
 
     void MazeDrawingComponent::Render() const
@@ -167,13 +203,12 @@ namespace dae
         const float scale = m_blockSize / 16.0f;
         const float bgWidth = 224.0f * scale;
         const float bgHeight = 256.0f * scale;
-        renderer.RenderTexture(*m_backgroundTexture, srcBackground, worldPos.x, worldPos.y, bgWidth, bgHeight);
+        renderer.RenderTexture(*m_backgroundTexture, srcBackground, worldPos.x + 16.0f, worldPos.y + 16.0f, bgWidth, bgHeight);
 
-        const Rect srcRect = { 0.0f, 0.0f, 16.0f, 16.0f };
         for (const auto& b : m_blocks)
         {
             if (!g_ShowFullMaze && b.removed) continue;
-            const glm::vec2 screenPos = GetScreenPos(b.r - 1, b.c - 1);
+            const glm::vec2 screenPos = GetScreenPos(b.r, b.c);
             const float dstX = worldPos.x + screenPos.x;
             const float dstY = worldPos.y + screenPos.y;
 
@@ -194,11 +229,9 @@ namespace dae
                     renderer.RenderTexture(*m_pengoTexture, animSrc, dstX, dstY, m_blockSize, m_blockSize);
                 }
             }
-            else if (b.type != TileType::WALL)
-            {
-                renderer.RenderTexture(*m_iceBlockTexture, srcRect, dstX, dstY, m_blockSize, m_blockSize);
-            }
         }
+
+        m_pIceBlockPool->Render();
     }
 
     glm::vec2 MazeDrawingComponent::GetScreenPos(int r, int c) const
@@ -223,6 +256,9 @@ namespace dae
         clone->m_spawnAnimationFrame = m_spawnAnimationFrame;
         clone->m_spawnAnimationTimer = m_spawnAnimationTimer;
         clone->m_pengoTexture = m_pengoTexture;
+        
+        // I Don't clone the pool, each instance needs its own pool
+
         return clone;
     }
 }

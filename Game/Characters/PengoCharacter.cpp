@@ -5,6 +5,10 @@
 #include "MoveCommand.h"
 #include "MoveReleaseCommand.h"
 #include "GameTime.h"
+#include "GridObjectComponent.h"
+#include "ServiceLocator.h"
+#include "CollisionGrid.h"
+#include "IceBlock.h"
 #include <iostream>
 
 namespace dae
@@ -52,6 +56,7 @@ namespace dae
 
         // Add the bridge component so the state machine updates during GameObject::Update
         AddComponent<PengoUpdateComponent>();
+        AddComponent<GridObjectComponent>();
     }
 
     PengoCharacter::~PengoCharacter()
@@ -184,6 +189,35 @@ namespace dae
         }
 
         m_targetPosition = currentPos + directionVec * m_blockSize;
-        m_isMovingToTarget = true;
+        
+        // Check if target position is walkable using CollisionGrid
+        const auto& grid = ServiceLocator::get_collision_grid();
+        const auto [row, col] = grid.WorldToGrid(m_targetPosition);
+        bool canMove = true;
+        if (grid.IsWithinBounds(row, col))
+        {
+            const auto objects = grid.GetObjectsAt(row, col);
+            for (auto* obj : objects)
+            {
+                if (dynamic_cast<IceBlock*>(obj))
+                {
+                    canMove = false;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            canMove = false;
+        }
+
+        if (canMove)
+        {
+            m_isMovingToTarget = true;
+        }
+        else
+        {
+            // Blocked
+        }
     }
 }

@@ -32,6 +32,7 @@ target_include_directories(minigin_engine PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/UI
   ${CMAKE_CURRENT_SOURCE_DIR}/Events
   ${CMAKE_CURRENT_SOURCE_DIR}/Audio
+  ${CMAKE_SOURCE_DIR}/Game/Systems
 )
 
 # Add VLD if available

@@ -53,6 +53,9 @@ namespace dae
 
 		SDL_Texture* CreateTextureFromSurface(SDL_Surface* surface) const;
 
+		void RenderRect(const Rect &rect, const Color &color) const;
+		void RenderRect(float x, float y, float width, float height, const Color &color) const;
+
 		void InitImGui() const;
 		void ImGuiNewFrame() const;
 		void RenderImGui() const;

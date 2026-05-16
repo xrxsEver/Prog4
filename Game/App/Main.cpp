@@ -19,6 +19,8 @@
 #include "TypeRegistry.h"
 #include "Achievements.h"
 #include "MazeDrawingComponent.h"
+#include "GameDebugUI.h"
+#include "ImGuiManager.h"
 
 #include <filesystem>
 #include <vector>
@@ -76,6 +78,7 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 		achievements->ObserveCharacter(pengoPtr);
 	}
 
+	dae::GameDebugUI::RegisterCustomTabs(dae::ImGuiManager::GetInstance());
 }
 
 int main(int, char *[])

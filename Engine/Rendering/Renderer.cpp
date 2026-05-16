@@ -86,6 +86,18 @@ SDL_Texture* dae::Renderer::CreateTextureFromSurface(SDL_Surface* surface) const
 	return SDL_CreateTextureFromSurface(m_renderer.get(), surface);
 }
 
+void dae::Renderer::RenderRect(const Rect &rect, const Color &color) const
+{
+	RenderRect(rect.x, rect.y, rect.width, rect.height, color);
+}
+
+void dae::Renderer::RenderRect(float x, float y, float width, float height, const Color &color) const
+{
+	SDL_SetRenderDrawColor(m_renderer.get(), color.r, color.g, color.b, color.a);
+	SDL_FRect r{x, y, width, height};
+	SDL_RenderRect(m_renderer.get(), &r);
+}
+
 void dae::Renderer::InitImGui() const
 {
 	ImGui_ImplSDL3_InitForSDLRenderer(m_window, m_renderer.get());

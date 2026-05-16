@@ -13,6 +13,7 @@
 #include "LoseLifeCommand.h"
 #include "MoveCommand.h"
 #include "Component.h"
+#include "GridObjectComponent.h"
 
 namespace dae
 {
@@ -41,7 +42,7 @@ namespace
     int GetRandomInt(int min, int max)
     {
         static std::random_device rd;
-        static std::mt19937 gen(rd()); // Fixed typo from mt19rng to mt19937
+        static std::mt19937 gen(rd());
         std::uniform_int_distribution<> dis(min, max);
         return dis(gen);
     }
@@ -49,7 +50,7 @@ namespace
     bool GetRandomChance(float probability)
     {
         static std::random_device rd;
-        static std::mt19937 gen(rd()); // Fixed typo from mt19rng to mt19937
+        static std::mt19937 gen(rd());
         std::uniform_real_distribution<float> dis(0.0f, 1.0f);
         return dis(gen) < probability;
     }
@@ -73,6 +74,7 @@ dae::SnoBeeCharacter::SnoBeeCharacter(ResourceManager &resourceManager, const Sn
     }
 
     AddComponent<BaseEnemyUpdateComponent>();
+    AddComponent<GridObjectComponent>();
 }
 
 dae::SnoBeeCharacter::~SnoBeeCharacter() = default;
@@ -82,6 +84,11 @@ void dae::SnoBeeCharacter::PerformAction(float dt)
     if (health <= 0 && m_currentState != EnemyState::Dead)
     {
         ChangeState(EnemyState::Dead);
+    }
+
+    if (m_currentState == EnemyState::Dead)
+    {
+        return;
     }
 
     if (m_currentState == EnemyState::Hatching)
@@ -290,6 +297,13 @@ glm::vec2 dae::SnoBeeCharacter::GetRandomValidDirection(const std::vector<glm::v
 void dae::SnoBeeCharacter::ChangeState(const EnemyState nextState)
 {
     m_currentState = nextState;
+    if (m_currentState == EnemyState::Dead)
+    {
+        if (auto pGridComp = GetComponent<GridObjectComponent>())
+        {
+            pGridComp->Disable();
+        }
+    }
 }
 
 void dae::SnoBeeCharacter::BindGamepadControls(InputManager &inputManager, const std::uint32_t gamepadIndex)

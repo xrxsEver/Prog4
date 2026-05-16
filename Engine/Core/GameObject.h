@@ -32,7 +32,7 @@ namespace dae
 		const glm::vec3 &GetLocalPosition() const { return m_localPosition; }
 		const glm::vec3 &GetLocalRotation() const { return m_localRotation; }
 		const glm::vec3 &GetLocalScale() const { return m_localScale; }
-		const glm::vec3 &GetWorldPosition();
+		const glm::vec3 &GetWorldPosition() const;
 		Transform &GetTransform();
 		const Transform &GetTransform() const;
 		void SetName(std::string name);
