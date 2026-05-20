@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 #include <vector>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
@@ -34,8 +35,8 @@ namespace dae
         [[nodiscard]] constexpr std::pair<int, int> WorldToGrid(const glm::vec3& worldPos) const
         {
             return {
-                static_cast<int>((worldPos.y - m_renderOffsetY) / CELL_SIZE),
-                static_cast<int>((worldPos.x - m_renderOffsetX) / CELL_SIZE)
+                static_cast<int>(std::floor((worldPos.y - m_renderOffsetY) / CELL_SIZE)),
+                static_cast<int>(std::floor((worldPos.x - m_renderOffsetX) / CELL_SIZE))
             };
         }
 

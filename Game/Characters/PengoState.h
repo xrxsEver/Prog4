@@ -47,6 +47,10 @@ namespace dae
         void OnExit(PengoCharacter *pPengo) override;
         std::unique_ptr<PengoState> HandleInput(PengoCharacter *pPengo) override;
         std::unique_ptr<PengoState> Update(PengoCharacter *pPengo) override;
+
+    private:
+        float m_timer{0.0f};
+        static constexpr float PUSH_DURATION = 0.4f;
     };
 
     class DyingState final : public PengoState

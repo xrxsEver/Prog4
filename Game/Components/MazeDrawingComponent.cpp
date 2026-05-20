@@ -75,6 +75,8 @@ namespace dae
 
     void MazeDrawingComponent::Update(float deltaTime)
     {
+        m_pIceBlockPool->Update(deltaTime);
+
         if (m_isFinished)
         {
             if (m_spawnStep == SpawnStep::None) return;
@@ -189,8 +191,6 @@ namespace dae
                 }
             }
         }
-
-        m_pIceBlockPool->Update(deltaTime);
     }
 
     void MazeDrawingComponent::Render() const

@@ -53,6 +53,7 @@ namespace dae
         void SetDirection(PengoDirection direction);
         PengoDirection GetDirection() const;
         void SetAnimationFrame(int frameIndex);
+        void Push();
 
         void SetSpriteData(int row, int startCol, bool isMoving);
 

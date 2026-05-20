@@ -4,6 +4,7 @@
 #include "InputManager.h"
 #include "MoveCommand.h"
 #include "MoveReleaseCommand.h"
+#include "PushCommand.h"
 #include "GameTime.h"
 #include "GridObjectComponent.h"
 #include "ServiceLocator.h"
@@ -77,7 +78,8 @@ namespace dae
         inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{-1, 0}));
         inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{1, 0}));
 
-
+        // Action - Push
+        inputManager.BindKeyboardCommand(SDL_SCANCODE_SPACE, KeyState::Down, std::make_unique<PushCommand>(*this));
     }
 
     void PengoCharacter::UpdateStateMachine()
@@ -119,10 +121,75 @@ namespace dae
 
         m_pRenderComponent->SetSourceRect(
             m_animationFrame * SPRITE_SIZE,
-            0,
+            m_spriteRow * SPRITE_SIZE,
             SPRITE_SIZE,
             SPRITE_SIZE
         );
+    }
+
+    void PengoCharacter::Push()
+    {
+        glm::vec3 directionVec{0, 0, 0};
+        switch (m_currentDirection)
+        {
+        case PengoDirection::Up:    directionVec.y = -1; break;
+        case PengoDirection::Down:  directionVec.y = 1;  break;
+        case PengoDirection::Left:  directionVec.x = -1; break;
+        case PengoDirection::Right: directionVec.x = 1;  break;
+        }
+
+        const auto& grid = ServiceLocator::get_collision_grid();
+        const glm::vec3 currentPos = GetLocalPosition();
+        const glm::vec3 tileAheadPos = currentPos + directionVec * m_blockSize;
+
+        const auto [rowAhead, colAhead] = grid.WorldToGrid(tileAheadPos);
+        if (!grid.IsWithinBounds(rowAhead, colAhead)) return;
+
+        IceBlock* pIceBlockAhead = nullptr;
+        const auto objectsAhead = grid.GetObjectsAt(rowAhead, colAhead);
+        for (auto* obj : objectsAhead)
+        {
+            if (auto* pBlock = dynamic_cast<IceBlock*>(obj))
+            {
+                pIceBlockAhead = pBlock;
+                break;
+            }
+        }
+
+        if (pIceBlockAhead)
+        {
+            const glm::vec3 tileBehindPos = tileAheadPos + directionVec * m_blockSize;
+            const auto [rowBehind, colBehind] = grid.WorldToGrid(tileBehindPos);
+
+            bool isOccupied = false;
+            if (grid.IsWithinBounds(rowBehind, colBehind))
+            {
+                const auto objectsBehind = grid.GetObjectsAt(rowBehind, colBehind);
+                if (!objectsBehind.empty())
+                {
+                    isOccupied = true;
+                }
+            }
+            else
+            {
+                // Out of bounds is treated as occupied (wall)
+                isOccupied = true;
+            }
+
+            if (isOccupied)
+            {
+                pIceBlockAhead->Crush();
+            }
+            else
+            {
+                pIceBlockAhead->Slide(glm::vec2{directionVec.x, directionVec.y});
+            }
+
+            // Transition Pengo to pushing state
+            m_pCurrentState->OnExit(this);
+            m_pCurrentState = std::make_unique<PushingState>();
+            m_pCurrentState->OnEnter(this);
+        }
     }
 
     void PengoCharacter::ApplyStateSwap() {}

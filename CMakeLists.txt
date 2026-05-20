@@ -169,6 +169,7 @@ set(GAME_SOURCES
   Game/Commands/AddScoreCommand.cpp
   Game/Commands/LoseLifeCommand.cpp
   Game/Commands/MoveCommand.cpp
+  Game/Commands/PushCommand.cpp
   Game/Characters/Character.cpp
   Game/Characters/BaseEnemy.cpp
   Game/Characters/PengoCharacter.cpp
