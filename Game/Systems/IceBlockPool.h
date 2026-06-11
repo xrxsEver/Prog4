@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <memory>
+#include <glm/vec3.hpp>
 #include "IceBlock.h"
 
 namespace dae
@@ -24,6 +25,10 @@ namespace dae
 
         // Encapsulated interface (I.30)
         void Spawn(float x, float y);
+
+        // Snapshot the live blocks (for remembering the maze) and put them back later
+        [[nodiscard]] std::vector<glm::vec3> GetActivePositions() const;
+        void Restore(const std::vector<glm::vec3>& positions);
 
         void Update(float deltaTime);
         void Render() const;

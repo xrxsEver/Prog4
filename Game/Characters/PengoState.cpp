@@ -133,12 +133,19 @@ namespace dae
     }
 
     // --- DyingState ---
-    void DyingState::OnEnter(PengoCharacter * /*pPengo*/)
+    void DyingState::OnEnter(PengoCharacter *pPengo)
     {
+        m_animationTimer = 0.0f;
+        m_currentFrame = 0;
+
+        // Death frames live one row below the walk row, same columns
+        pPengo->SetSpriteData(1, 0, false);
+        UpdateAnimation(pPengo);
     }
 
-    void DyingState::OnExit(PengoCharacter * /*pPengo*/)
+    void DyingState::OnExit(PengoCharacter *pPengo)
     {
+        pPengo->SetSpriteData(0, 0, false); // back to the walk row
     }
 
     std::unique_ptr<PengoState> DyingState::HandleInput(PengoCharacter * /*pPengo*/)
@@ -146,8 +153,32 @@ namespace dae
         return nullptr;
     }
 
-    std::unique_ptr<PengoState> DyingState::Update(PengoCharacter * /*pPengo*/)
+    void DyingState::UpdateAnimation(PengoCharacter *pPengo)
     {
+        PengoDirection dir = pPengo->GetDirection();
+        int baseFrame = 0;
+
+        switch (dir)
+        {
+        case PengoDirection::Down:  baseFrame = 0; break;
+        case PengoDirection::Left:  baseFrame = 2; break;
+        case PengoDirection::Up:    baseFrame = 4; break;
+        case PengoDirection::Right: baseFrame = 6; break;
+        }
+
+        pPengo->SetAnimationFrame(baseFrame + m_currentFrame);
+    }
+
+    std::unique_ptr<PengoState> DyingState::Update(PengoCharacter *pPengo)
+    {
+        // Keep looping the death animation; the level coordinator pulls us out via Respawn()
+        m_animationTimer += GameTime::GetInstance().GetDeltaTime();
+        if (m_animationTimer >= ANIMATION_FRAME_DURATION)
+        {
+            m_animationTimer -= ANIMATION_FRAME_DURATION;
+            m_currentFrame = (m_currentFrame + 1) % 2;
+            UpdateAnimation(pPengo);
+        }
         return nullptr;
     }
 }

@@ -60,6 +60,9 @@ void Scene::Update(float deltaTime)
         }
 	}
 
+	// Sync the Sno-Bee manager's raw pointers before we free the objects they point at
+	m_snoBeeManager->RemoveMarked();
+
 	m_objects.erase(
 		std::remove_if(
 			m_objects.begin(),

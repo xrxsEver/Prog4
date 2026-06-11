@@ -45,6 +45,20 @@ namespace dae
 
         bool IsEnabled() const { return m_isEnabled; }
 
+        // Push our current position into the grid immediately, rather than waiting for the next
+        // Update. Used when an ice block shoves a Sno-Bee and later queries must see the new cell.
+        void SyncToCurrentPosition()
+        {
+            if (!m_isEnabled) return;
+
+            const glm::vec3& currentPos = GetOwner()->GetWorldPosition();
+            if (currentPos != m_lastPos)
+            {
+                ServiceLocator::get_collision_grid().UpdateObject(GetOwner(), m_lastPos, currentPos);
+                m_lastPos = currentPos;
+            }
+        }
+
         virtual void Update(float /*deltaTime*/) override
         {
             if (!m_isEnabled) return;

@@ -82,8 +82,7 @@ namespace dae
         {
             if (auto* iceBlock = dynamic_cast<IceBlock*>(obj))
             {
-                iceBlock->Reset();
-                // Grid update will be handled by Reset calling SetPosition or by IceBlock's GridObjectComponent
+                iceBlock->Crush(); // play the shatter animation, then it removes itself
                 return;
             }
         }

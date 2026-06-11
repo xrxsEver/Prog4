@@ -10,6 +10,7 @@
 #include "ServiceLocator.h"
 #include "CollisionGrid.h"
 #include "IceBlock.h"
+#include "BaseEnemy.h"
 #include <iostream>
 
 namespace dae
@@ -84,6 +85,12 @@ namespace dae
 
     void PengoCharacter::UpdateStateMachine()
     {
+        // A SnoBee touching us is lethal, but only while we are still alive
+        if (!m_isDying)
+        {
+            CheckEnemyCollision();
+        }
+
         // Handle movement processing (grid snapping, target reaching)
         ProcessMovement();
 
@@ -164,10 +171,14 @@ namespace dae
             bool isOccupied = false;
             if (grid.IsWithinBounds(rowBehind, colBehind))
             {
-                const auto objectsBehind = grid.GetObjectsAt(rowBehind, colBehind);
-                if (!objectsBehind.empty())
+                // Only another ice block stops the slide; a Sno-Bee behind it gets shoved and squashed
+                for (auto* obj : grid.GetObjectsAt(rowBehind, colBehind))
                 {
-                    isOccupied = true;
+                    if (dynamic_cast<IceBlock*>(obj))
+                    {
+                        isOccupied = true;
+                        break;
+                    }
                 }
             }
             else
@@ -189,6 +200,52 @@ namespace dae
             m_pCurrentState->OnExit(this);
             m_pCurrentState = std::make_unique<PushingState>();
             m_pCurrentState->OnEnter(this);
+        }
+    }
+
+    void PengoCharacter::Die()
+    {
+        if (m_isDying) return;
+        m_isDying = true;
+
+        // Drop any pending movement so we don't slide while dying
+        m_activeMoveInputs.clear();
+        m_isMovingToTarget = false;
+
+        m_pCurrentState->OnExit(this);
+        m_pCurrentState = std::make_unique<DyingState>();
+        m_pCurrentState->OnEnter(this);
+    }
+
+    void PengoCharacter::Respawn(const glm::vec3& position)
+    {
+        LoseLife();
+        m_isDying = false;
+
+        m_activeMoveInputs.clear();
+        m_isMovingToTarget = false;
+
+        SetLocalPosition(position);
+        SetDirection(PengoDirection::Down);
+
+        // Back on our feet, idle again
+        m_pCurrentState->OnExit(this);
+        m_pCurrentState = std::make_unique<IdleState>();
+        m_pCurrentState->OnEnter(this);
+    }
+
+    void PengoCharacter::CheckEnemyCollision()
+    {
+        const auto& grid = ServiceLocator::get_collision_grid();
+        const auto [row, col] = grid.WorldToGrid(GetWorldPosition());
+        for (auto* obj : grid.GetObjectsAt(row, col))
+        {
+            // Only living enemies are dangerous (dead/squashed ones are harmless)
+            if (auto* enemy = dynamic_cast<BaseEnemy*>(obj); enemy && enemy->health > 0)
+            {
+                Die();
+                return;
+            }
         }
     }
 
@@ -220,6 +277,9 @@ namespace dae
 
     void PengoCharacter::ProcessMovement()
     {
+        // Frozen while the death animation plays
+        if (m_isDying) return;
+
         if (m_isMovingToTarget)
         {
             glm::vec3 currentPos = GetLocalPosition();

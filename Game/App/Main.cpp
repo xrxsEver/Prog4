@@ -19,6 +19,7 @@
 #include "TypeRegistry.h"
 #include "Achievements.h"
 #include "MazeDrawingComponent.h"
+#include "LivesIconComponent.h"
 #include "GameDebugUI.h"
 #include "ImGuiManager.h"
 
@@ -64,14 +65,21 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	pengo->SetPosition(-1000, -1000);
 
 	auto mazeIntro = std::make_unique<dae::GameObject>("Maze Intro");
-	mazeIntro->AddComponent<dae::MazeDrawingComponent>(scene, resourceManager, "level1.json", [pengoPtr](glm::vec2 pengoSpawnPos)
+	auto *mazeComp = mazeIntro->AddComponent<dae::MazeDrawingComponent>(scene, resourceManager, "level1.json", [pengoPtr](glm::vec2 pengoSpawnPos)
 													   {
 														   pengoPtr->SetPosition(pengoSpawnPos.x, pengoSpawnPos.y);
 													   });
+	mazeComp->SetPengo(pengoPtr); // let the maze drive the death / respawn sequence
 	mazeIntro->SetPosition(0, 0);
 	scene.Add(std::move(mazeIntro));
 
 	scene.Add(std::move(pengo));
+
+	// Lives display in the empty space to the right of the playfield
+	auto lives = std::make_unique<dae::GameObject>("Lives");
+	lives->AddComponent<dae::LivesIconComponent>(resourceManager, pengoPtr);
+	lives->SetPosition(760, 120);
+	scene.Add(std::move(lives));
 
 	if (dae::Achievements *achievements = dae::Achievements::GetActiveInstance(); achievements != nullptr)
 	{

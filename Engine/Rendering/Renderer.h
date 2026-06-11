@@ -55,6 +55,7 @@ namespace dae
 
 		void RenderRect(const Rect &rect, const Color &color) const;
 		void RenderRect(float x, float y, float width, float height, const Color &color) const;
+		void RenderFilledRect(float x, float y, float width, float height, const Color &color) const;
 
 		void InitImGui() const;
 		void ImGuiNewFrame() const;

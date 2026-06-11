@@ -60,6 +60,11 @@ namespace dae
         void OnExit(PengoCharacter *pPengo) override;
         std::unique_ptr<PengoState> HandleInput(PengoCharacter *pPengo) override;
         std::unique_ptr<PengoState> Update(PengoCharacter *pPengo) override;
+
+    private:
+        void UpdateAnimation(PengoCharacter *pPengo);
+        float m_animationTimer{0.0f};
+        int m_currentFrame{0};
     };
 }
 

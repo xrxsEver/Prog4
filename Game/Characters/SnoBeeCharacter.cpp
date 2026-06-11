@@ -14,6 +14,7 @@
 #include "MoveCommand.h"
 #include "Component.h"
 #include "GridObjectComponent.h"
+#include "ServiceLocator.h"
 
 namespace dae
 {
@@ -56,6 +57,19 @@ namespace
     }
 
     int g_SnoBeeCounter = 0;
+
+    // Sno-Bee sprite layout: 16px frames starting at column 8, rows are
+    // 0 spawn / 1 move / 2 angry (ice crushing) / 3 die, each with 4 directions x 2 frames.
+    constexpr float SNOBEE_SPRITE_SIZE = 16.0f;
+    constexpr int   SNOBEE_BASE_COL = 8;
+    constexpr int   SNOBEE_MOVE_ROW_OFFSET = 1;
+    constexpr int   SNOBEE_ANGRY_ROW_OFFSET = 2;
+    constexpr int   SNOBEE_DEATH_ROW_OFFSET = 3;
+    constexpr float SNOBEE_ANIM_FRAME_TIME = 0.15f;
+
+    constexpr float SNOBEE_ICE_CRUSH_TIME = 1.0f; // long enough for the ice block's break animation
+    constexpr int   SNOBEE_CRUSH_ABILITY_MIN = 4; // seconds before a Sno-Bee learns to crush ice
+    constexpr int   SNOBEE_CRUSH_ABILITY_MAX = 9;
 }
 
 dae::SnoBeeCharacter::SnoBeeCharacter(ResourceManager &resourceManager, const SnoBeeType* type)
@@ -66,6 +80,7 @@ dae::SnoBeeCharacter::SnoBeeCharacter(ResourceManager &resourceManager, const Sn
 
     m_targetPosition = GetLocalPosition();
     m_thinkTimerFrames = m_maxThinkFrames;
+    m_crushAbilityTimer = static_cast<float>(GetRandomInt(SNOBEE_CRUSH_ABILITY_MIN, SNOBEE_CRUSH_ABILITY_MAX));
 
     if (m_pType)
     {
@@ -88,11 +103,19 @@ void dae::SnoBeeCharacter::PerformAction(float dt)
 
     if (m_currentState == EnemyState::Dead)
     {
+        // Play the flattened death animation, then remove ourselves
+        UpdateAnimation(dt);
+        m_deathTimer -= dt;
+        if (m_deathTimer <= 0.0f)
+        {
+            MarkForDelete();
+        }
         return;
     }
 
     if (m_currentState == EnemyState::Hatching)
     {
+        // Spawning sprite stays as it is while the egg hatches
         m_hatchingTimer -= dt;
         if (m_hatchingTimer <= 0.0f)
         {
@@ -100,6 +123,28 @@ void dae::SnoBeeCharacter::PerformAction(float dt)
         }
         return;
     }
+
+    // Being carried by a sliding ice block: hold still and let the block move us
+    if (m_stunTimer > 0.0f)
+    {
+        m_stunTimer -= dt;
+        m_isMovingToTarget = false;
+        UpdateAnimation(dt);
+        return;
+    }
+
+    // Earn the ice-crushing ability after a short random delay
+    if (!m_canCrushIce)
+    {
+        m_crushAbilityTimer -= dt;
+        if (m_crushAbilityTimer <= 0.0f)
+        {
+            m_canCrushIce = true;
+        }
+    }
+
+    // Alive and on the move: cycle the walking animation
+    UpdateAnimation(dt);
 
     if (m_currentState == EnemyState::Wandering || m_currentState == EnemyState::Chasing)
     {
@@ -123,6 +168,15 @@ void dae::SnoBeeCharacter::PerformAction(float dt)
             return;
         }
 
+        // Blocked by ice we can crush: shatter it (with its break animation) and wait
+        if (m_canCrushIce && IsTileIce(m_currentDirection))
+        {
+            ChangeState(EnemyState::BreakingIce);
+            BreakBlockInDirection(m_currentDirection); // kicks off the ice block's crush animation
+            m_breakIceTimer = SNOBEE_ICE_CRUSH_TIME;
+            return;
+        }
+
         Think();
         m_thinkTimerFrames = m_maxThinkFrames;
         return;
@@ -130,16 +184,65 @@ void dae::SnoBeeCharacter::PerformAction(float dt)
 
     if (m_currentState == EnemyState::BreakingIce)
     {
+        // Wait for the ice to finish shattering, then step into the cleared tile
         m_breakIceTimer -= dt;
         if (m_breakIceTimer <= 0.0f)
         {
-            BreakBlockInDirection(m_currentDirection);
             ChangeState(EnemyState::Chasing);
             m_targetPosition = GetLocalPosition() + glm::vec3(m_currentDirection.x, m_currentDirection.y, 0.0f) * m_blockSize;
             m_isMovingToTarget = true;
         }
         return;
     }
+}
+
+int dae::SnoBeeCharacter::DirectionBaseFrame(const glm::vec2& dir) const
+{
+    // Same column layout as Pengo: down / left / up / right, two frames each
+    if (dir.y > 0.5f)  return 0; // down
+    if (dir.x < -0.5f) return 2; // left
+    if (dir.y < -0.5f) return 4; // up
+    return 6;                     // right
+}
+
+void dae::SnoBeeCharacter::UpdateAnimation(float dt)
+{
+    const int baseRow = 9 + (m_pType ? m_pType->spriteSheetRowOffset : 0);
+
+    int row = baseRow + SNOBEE_MOVE_ROW_OFFSET;
+    glm::vec2 dir = m_currentDirection;
+    if (m_currentState == EnemyState::Dead)
+    {
+        row = baseRow + SNOBEE_DEATH_ROW_OFFSET;
+        dir = m_deathDirection; // squashed along the block's direction, not where we faced
+    }
+    else if (m_currentState == EnemyState::BreakingIce)
+    {
+        row = baseRow + SNOBEE_ANGRY_ROW_OFFSET; // angry frames while crushing ice
+    }
+
+    m_animTimer += dt;
+    if (m_animTimer >= SNOBEE_ANIM_FRAME_TIME)
+    {
+        m_animTimer -= SNOBEE_ANIM_FRAME_TIME;
+        m_animFrame = (m_animFrame + 1) % 2;
+    }
+
+    const int col = SNOBEE_BASE_COL + DirectionBaseFrame(dir) + m_animFrame;
+    SetSpriteSourceRect(col * SNOBEE_SPRITE_SIZE, row * SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE);
+}
+
+void dae::SnoBeeCharacter::CrushFrom(const glm::vec2& squashDirection)
+{
+    if (health <= 0) return; // already done for
+    m_deathDirection = squashDirection;
+    health = 0;
+}
+
+void dae::SnoBeeCharacter::Stun(float duration)
+{
+    m_stunTimer = duration;
+    m_isMovingToTarget = false;
 }
 
 void dae::SnoBeeCharacter::ProcessMovement(float dt)
@@ -215,10 +318,11 @@ void dae::SnoBeeCharacter::ChasePlayer()
         return;
     }
 
-    if (IsTileIce(primaryDir) && m_pType && m_pType->isAggressive)
+    // Head straight through ice toward the player once we can crush it
+    if (m_canCrushIce && IsTileIce(primaryDir))
     {
-        MaybeBreakIce(primaryDir);
-        if (m_currentState == EnemyState::BreakingIce) return;
+        m_currentDirection = primaryDir;
+        return;
     }
 
     if (IsTileWalkable(secondaryDir))
@@ -227,10 +331,10 @@ void dae::SnoBeeCharacter::ChasePlayer()
         return;
     }
 
-    if (IsTileIce(secondaryDir) && m_pType && m_pType->isAggressive)
+    if (m_canCrushIce && IsTileIce(secondaryDir))
     {
-        MaybeBreakIce(secondaryDir);
-        if (m_currentState == EnemyState::BreakingIce) return;
+        m_currentDirection = secondaryDir;
+        return;
     }
 
     m_currentDirection = GetRandomValidDirection(GetValidDirections(), primaryDir);
@@ -241,17 +345,6 @@ void dae::SnoBeeCharacter::Wander()
     ChangeState(EnemyState::Wandering);
     std::vector<glm::vec2> validDirs = GetValidDirections();
     m_currentDirection = GetRandomValidDirection(validDirs);
-}
-
-void dae::SnoBeeCharacter::MaybeBreakIce(const glm::vec2& blockedDir)
-{
-    float aggression = m_pType && m_pType->isAggressive ? 0.5f : 0.1f;
-    if (GetRandomChance(aggression))
-    {
-        ChangeState(EnemyState::BreakingIce);
-        m_currentDirection = blockedDir;
-        m_breakIceTimer = 1.0f; // 1 second to break ice
-    }
 }
 
 std::vector<glm::vec2> dae::SnoBeeCharacter::GetValidDirections() const
@@ -303,6 +396,13 @@ void dae::SnoBeeCharacter::ChangeState(const EnemyState nextState)
         {
             pGridComp->Disable();
         }
+
+        // Restart the animation so the death frames play from the first one
+        m_animTimer = 0.0f;
+        m_animFrame = 0;
+
+        ServiceLocator::get_sound_system().play("Sounds/Snow-Bee Squashed.mp3", 0.6f);
+        m_deathTimer = DEATH_DISPLAY_TIME;
     }
 }
 

@@ -48,6 +48,13 @@ namespace dae
 
         void BindKeyboardControls(InputManager& inputManager);
 
+        // Kick off the dying sequence (ignored if already dying). Pengo then holds the
+        // dying animation until the level coordinator calls Respawn().
+        void Die();
+        bool IsDying() const { return m_isDying; }
+        // Lose a life and drop back into play at the given spot, facing down
+        void Respawn(const glm::vec3& position);
+
         bool HasMoved() const;
 
         void SetDirection(PengoDirection direction);
@@ -64,6 +71,8 @@ namespace dae
     private:
         void UpdateRenderComponent();
         void ProcessMovement();
+        // Look for a living enemy sharing Pengo's tile and die if one is found
+        void CheckEnemyCollision();
 
         std::unique_ptr<PengoState> m_pCurrentState;
         glm::vec3 m_previousPosition{};
@@ -78,6 +87,9 @@ namespace dae
         // Grid movement variables
         glm::vec3 m_targetPosition{};
         bool m_isMovingToTarget{false};
+
+        // Death / respawn state
+        bool m_isDying{false};
 
         // float m_animationTimer{0.0f};
         // int m_currentFrame{0};

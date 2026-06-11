@@ -7,6 +7,7 @@
 #include "MazeGenerator.h"
 #include "Scene.h"
 #include "SnoBeeCharacter.h"
+#include "PengoCharacter.h"
 #include "TypeRegistry.h"
 #include "CollisionGrid.h"
 #include <algorithm>
@@ -75,6 +76,15 @@ namespace dae
 
     void MazeDrawingComponent::Update(float deltaTime)
     {
+        // Once the intro is over the maze runs as a little state machine
+        switch (m_phase)
+        {
+        case LevelPhase::Playing:   UpdatePlaying(deltaTime);   return;
+        case LevelPhase::DeathWipe: UpdateDeathWipe(deltaTime); return;
+        case LevelPhase::DeathHold: UpdateDeathHold(deltaTime); return;
+        default: break; // Intro keeps using the original draw / hatch logic below
+        }
+
         m_pIceBlockPool->Update(deltaTime);
 
         if (m_isFinished)
@@ -122,6 +132,7 @@ namespace dae
                         
                         if (m_onFinished) m_onFinished(m_pengoSpawnPos);
                         m_spawnStep = SpawnStep::None;
+                        m_phase = LevelPhase::Playing; // intro done, hand over to gameplay
                     }
                 }
             }
@@ -188,8 +199,123 @@ namespace dae
                 else
                 {
                     if (m_onFinished) m_onFinished(m_pengoSpawnPos);
+                    m_phase = LevelPhase::Playing; // no hatch to play, straight to gameplay
                 }
             }
+        }
+    }
+
+    void MazeDrawingComponent::UpdatePlaying(float deltaTime)
+    {
+        m_pIceBlockPool->Update(deltaTime);
+
+        // Pengo dying kicks off the life-lost sequence
+        if (m_pPengo && m_pPengo->IsDying())
+        {
+            StartDeathSequence();
+        }
+    }
+
+    void MazeDrawingComponent::StartDeathSequence()
+    {
+        m_phase = LevelPhase::DeathWipe;
+        m_wipeProgress = 0.0f;
+
+        // Remember how many enemies were around, then clear them off the field
+        m_rememberedSnoBeeCount = ClearSnoBees();
+
+        // Remember where the surviving ice blocks sit so we can rebuild the maze
+        m_blockSnapshot = m_pIceBlockPool->GetActivePositions();
+
+        ServiceLocator::get_sound_system().stop_music();
+    }
+
+    void MazeDrawingComponent::UpdateDeathWipe(float deltaTime)
+    {
+        // Slide the black curtain down over the whole playfield
+        m_wipeProgress += WIPE_SPEED * deltaTime;
+
+        const float fieldHeight = m_rows * m_blockSize;
+        if (m_wipeProgress >= fieldHeight)
+        {
+            m_wipeProgress = fieldHeight;
+            m_phase = LevelPhase::DeathHold;
+            m_holdTimer = DEATH_HOLD_TIME;
+        }
+    }
+
+    void MazeDrawingComponent::UpdateDeathHold(float deltaTime)
+    {
+        m_holdTimer -= deltaTime;
+        if (m_holdTimer <= 0.0f)
+        {
+            BeginRespawn();
+        }
+    }
+
+    void MazeDrawingComponent::BeginRespawn()
+    {
+        // Put the remembered ice blocks back where they were
+        m_pIceBlockPool->Restore(m_blockSnapshot);
+
+        // Drop Pengo back at his original start tile, alive again
+        if (m_pPengo)
+        {
+            m_pPengo->Respawn({ m_pengoSpawnPos.x, m_pengoSpawnPos.y, 0.0f });
+        }
+
+        // Hatch the same number of Sno-Bees that were alive before
+        SpawnSnoBees(m_rememberedSnoBeeCount);
+
+        m_phase = LevelPhase::Playing;
+    }
+
+    int MazeDrawingComponent::ClearSnoBees()
+    {
+        int count = 0;
+        for (const auto& obj : m_scene.GetObjects())
+        {
+            if (auto* snoBee = dynamic_cast<SnoBeeCharacter*>(obj.get()))
+            {
+                if (!snoBee->IsMarkedForDelete())
+                {
+                    ++count;
+                    snoBee->MarkForDelete();
+                }
+            }
+        }
+        return count;
+    }
+
+    void MazeDrawingComponent::SpawnSnoBees(int count)
+    {
+        if (count <= 0) return;
+
+        // Collect the maze ice cells we can hatch on
+        std::vector<int> iceCells;
+        for (int i = 0; i < static_cast<int>(m_blocks.size()); ++i)
+        {
+            if (!m_blocks[i].removed && m_blocks[i].type == TileType::ICE)
+            {
+                iceCells.push_back(i);
+            }
+        }
+        if (iceCells.empty()) return;
+
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(iceCells.begin(), iceCells.end(), g);
+
+        const SnoBeeType* basicType = TypeRegistry::GetInstance().GetSnoBeeType("Basic");
+        for (int k = 0; k < count; ++k)
+        {
+            const auto& b = m_blocks[iceCells[k % iceCells.size()]];
+            auto snoBee = std::make_unique<SnoBeeCharacter>(m_resourceManager, basicType);
+            const glm::vec2 screenPos = GetScreenPos(b.r, b.c);
+            snoBee->SetLocalPosition({ screenPos.x, screenPos.y, 0 });
+
+            m_scene.AddSnoBee(snoBee.get());
+            m_scene.Add(std::move(snoBee));
         }
     }
 
@@ -232,6 +358,13 @@ namespace dae
         }
 
         m_pIceBlockPool->Render();
+
+        // Black curtain that swallows the playfield while Pengo is dying (drawn under Pengo)
+        if (m_phase == LevelPhase::DeathWipe || m_phase == LevelPhase::DeathHold)
+        {
+            const float fieldWidth = m_cols * m_blockSize;
+            renderer.RenderFilledRect(worldPos.x, worldPos.y, fieldWidth, m_wipeProgress, Color{ 0, 0, 0, 255 });
+        }
     }
 
     glm::vec2 MazeDrawingComponent::GetScreenPos(int r, int c) const

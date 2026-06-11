@@ -47,6 +47,36 @@ namespace dae
         }
     }
 
+    std::vector<glm::vec3> IceBlockPool::GetActivePositions() const
+    {
+        std::vector<glm::vec3> positions;
+        for (const auto& block : m_pool)
+        {
+            if (block->IsActive())
+            {
+                positions.push_back(block->GetLocalPosition());
+            }
+        }
+        return positions;
+    }
+
+    void IceBlockPool::Restore(const std::vector<glm::vec3>& positions)
+    {
+        // Wipe the pool clean, then re-place a block at each remembered spot
+        for (auto& block : m_pool)
+        {
+            block->Reset();
+        }
+
+        for (const auto& pos : positions)
+        {
+            if (IceBlock* block = Acquire())
+            {
+                block->SetPosition(pos.x, pos.y);
+            }
+        }
+    }
+
     void IceBlockPool::Update(float deltaTime)
     {
         for (auto& block : m_pool)

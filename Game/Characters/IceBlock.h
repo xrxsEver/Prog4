@@ -14,7 +14,8 @@ namespace dae
         {
             Idle,
             Sliding,
-            Crushing
+            Crushing,
+            ShowingScore // flashing the kill score before settling as a normal block
         };
 
         explicit IceBlock(ResourceManager& resourceManager);
@@ -31,6 +32,9 @@ namespace dae
         void Crush();
         void Slide(const glm::vec2& direction);
 
+        bool IsSliding() const { return m_state == State::Sliding; }
+        const glm::vec2& GetSlideDirection() const { return m_slideDirection; }
+
     private:
         bool m_isActive{ false };
         RenderComponent* m_pRenderComponent{ nullptr };
@@ -42,8 +46,12 @@ namespace dae
         int m_crushFrame{ 0 };
         std::shared_ptr<Texture2D> m_miscTexture;
 
+        float m_scoreTimer{ 0.0f };
+        std::shared_ptr<Texture2D> m_scoresTexture;
+
         static constexpr float CRUSH_FRAME_TIME = 0.1f;
         static constexpr int CRUSH_FRAMES = 9;
         static constexpr float SLIDE_SPEED = 250.0f;
+        static constexpr float SCORE_DISPLAY_TIME = 2.0f;
     };
 }
