@@ -59,6 +59,9 @@ namespace dae
         // Hook Pengo up so the maze can react when he dies
         void SetPengo(PengoCharacter* pPengo) { m_pPengo = pPengo; }
 
+        // How many Sno-Bees are still waiting in the reserve (drives the on-screen counter)
+        int GetSnoBeeReserve() const { return m_snoBeeReserve; }
+
         const char* GetDebugName() const override { return "Maze Drawing Component"; }
         std::unique_ptr<Component> Clone(GameObject* pOwner) const override;
 
@@ -75,6 +78,17 @@ namespace dae
         void BeginRespawn();
         int ClearSnoBees();          // remove every Sno-Bee, return how many were alive
         void SpawnSnoBees(int count);
+
+        // Reserve Sno-Bees wait as red eggs on the ice, then hatch one at a time with the spawn animation
+        bool AdvanceSpawnAnimation(float deltaTime); // steps the ice-break / hatch animation, spawns on finish
+        void SetupReserveEggs();                     // scatter the remaining reserve as flashing red eggs
+        void BeginReserveHatch();                    // hatch one egg with the spawn animation, removing its ice block
+        void UpdateRedFlash(float deltaTime);
+
+        // Diamond blocks: push-only blocks that grant a bonus when lined up three in a row
+        void SetupDiamonds();                        // mark three ice blocks as diamonds
+        void CheckDiamondLine();                     // award the bonus + stun when the diamonds line up
+        void StunAllSnoBees(float duration);
 
         Scene& m_scene;
         ResourceManager& m_resourceManager;
@@ -114,6 +128,31 @@ namespace dae
         float m_holdTimer = 0.0f;
         int m_rememberedSnoBeeCount = 0;
         std::vector<glm::vec3> m_blockSnapshot{};    // remembered ice-block positions
+
+        // A level has a fixed pool of Sno-Bees; the first wave hatches 3, the rest wait in reserve
+        static constexpr int TOTAL_SNOBEES = 12;
+        int m_snoBeeReserve = TOTAL_SNOBEES;
+
+        // The reserve trickles out one at a time: sit idle, flash all eggs for a moment, then hatch one
+        float m_hatchTimer = HATCH_INTERVAL - PRE_SPAWN_FLASH;
+        static constexpr float HATCH_INTERVAL = 8.0f;   // seconds between reserve hatches
+        static constexpr float PRE_SPAWN_FLASH = 2.0f;  // eggs flash this long before one hatches
+
+        std::vector<int> m_eggBlocks{};       // ice tiles holding un-hatched reserve Sno-Bees
+        bool m_hatchingReserve = false;       // is the running spawn animation a reserve hatch (not the intro)?
+
+        // Diamond blocks (push-only); lining all three up grants a bonus and stuns every Sno-Bee
+        std::vector<IceBlock*> m_diamondBlocks{};
+        std::vector<glm::vec3> m_diamondSnapshot{}; // remembered diamond positions across a respawn
+        bool m_diamondLineActive = false;           // currently lined up (so we only award once per line-up)
+        static constexpr int DIAMOND_COUNT = 3;
+        static constexpr int DIAMOND_BONUS = 5000;
+        static constexpr float DIAMOND_STUN_TIME = 6.0f;
+        bool m_eggsFlashing = false;          // are the eggs in their pre-spawn flash window?
+        float m_flashWindowTimer = 0.0f;
+        float m_redFlashTimer = 0.0f;
+        bool m_redFlashOn = false;
+        static constexpr float RED_FLASH_INTERVAL = 0.25f;
 
         static constexpr float SPAWN_FRAME_TIME = 0.1f;
         static constexpr float SNOBEE_SPAWN_FRAME_TIME = 0.2f;

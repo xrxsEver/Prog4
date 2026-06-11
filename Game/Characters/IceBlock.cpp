@@ -55,15 +55,30 @@ namespace dae
                     Renderer::GetInstance().RenderTexture(*m_miscTexture, animSrc, worldPos.x, worldPos.y, 32.0f, 32.0f);
                 }
             }
+            else if (m_state == State::EggBreaking)
+            {
+                if (m_miscTexture)
+                {
+                    // Egg-break frames live on the 5th row of misc.png
+                    const auto& worldPos = GetWorldPosition();
+                    Rect animSrc = { m_crushFrame * 16.0f, EGG_BREAK_ROW_Y, 16.0f, 16.0f };
+                    Renderer::GetInstance().RenderTexture(*m_miscTexture, animSrc, worldPos.x, worldPos.y, 32.0f, 32.0f);
+                }
+            }
             else if (m_state == State::ShowingScore)
             {
                 if (m_scoresTexture)
                 {
-                    // Blue 400 (second row, second column) in scores.png, drawn centred on the tile
                     const auto& worldPos = GetWorldPosition();
-                    const Rect scoreSrc = { 16.0f, 16.0f, 16.0f, 16.0f };
-                    Renderer::GetInstance().RenderTexture(*m_scoresTexture, scoreSrc, worldPos.x , worldPos.y, 32.0f, 32.0f);
+                    Renderer::GetInstance().RenderTexture(*m_scoresTexture, m_scoreSrcRect, worldPos.x, worldPos.y, 32.0f, 32.0f);
                 }
+            }
+            else if (m_isDiamond && m_miscTexture)
+            {
+                // Diamond block (misc.png row 2, first cell) — also drawn while it slides
+                const auto& worldPos = GetWorldPosition();
+                const Rect diamondSrc = { 0.0f, 16.0f, 16.0f, 16.0f };
+                Renderer::GetInstance().RenderTexture(*m_miscTexture, diamondSrc, worldPos.x, worldPos.y, 32.0f, 32.0f);
             }
             else
             {
@@ -90,12 +105,34 @@ namespace dae
                     }
                 }
             }
+            else if (m_state == State::EggBreaking)
+            {
+                m_crushTimer += deltaTime;
+                if (m_crushTimer >= EGG_BREAK_FRAME_TIME)
+                {
+                    m_crushTimer -= EGG_BREAK_FRAME_TIME;
+                    m_crushFrame++;
+                    if (m_crushFrame >= EGG_BREAK_FRAMES)
+                    {
+                        // Egg finished breaking: flash the 500 (first row, last column of scores.png)
+                        m_scoreSrcRect = Rect{ 80.0f, 0.0f, 16.0f, 16.0f };
+                        m_removeAfterScore = true;
+                        m_scoreTimer = SCORE_DISPLAY_TIME;
+                        m_state = State::ShowingScore;
+                    }
+                }
+            }
             else if (m_state == State::ShowingScore)
             {
-                // Hold the score for a moment, then settle into a normal ice block
+                // Hold the score for a moment, then settle into a normal ice block (or vanish for an egg)
                 m_scoreTimer -= deltaTime;
                 if (m_scoreTimer <= 0.0f)
                 {
+                    if (m_removeAfterScore)
+                    {
+                        m_removeAfterScore = false;
+                        SetActive(false);
+                    }
                     m_state = State::Idle;
                 }
             }
@@ -105,18 +142,6 @@ namespace dae
                 const glm::vec3 nextPos = currentPos + glm::vec3(m_slideDirection.x, m_slideDirection.y, 0.0f) * SLIDE_SPEED * deltaTime;
 
                 const auto& grid = ServiceLocator::get_collision_grid();
-                
-                // Use leading edge for collision detection to avoid overlapping sprites
-                glm::vec3 leadingPos = nextPos;
-                if (m_slideDirection.x > 0) leadingPos.x += 31.0f; // Right edge
-                else if (m_slideDirection.x < 0) leadingPos.x += 0.0f; // Left edge
-                else if (m_slideDirection.y > 0) leadingPos.y += 31.0f; // Bottom edge
-                else if (m_slideDirection.y < 0) leadingPos.y += 0.0f; // Top edge
-
-                const auto [currentRow, currentCol] = grid.WorldToGrid(currentPos);
-                const auto [nextRow, nextCol] = grid.WorldToGrid(leadingPos);
-
-                bool blocked = false;
 
                 // Carry a Sno-Bee that is directly in front of us: shove it along smoothly, and
                 // only squash it once it has nowhere left to go (a wall or another ice block).
@@ -163,6 +188,8 @@ namespace dae
                         const auto [beeRow, beeCol] = grid.WorldToGrid(beeCenter);
                         snoBee->CrushFrom(m_slideDirection);
                         SetLocalPosition(grid.GridToWorld(beeRow, beeCol));
+                        m_scoreSrcRect = Rect{ 16.0f, 16.0f, 16.0f, 16.0f }; // blue 400
+                        m_removeAfterScore = false;                          // settle back into a normal block
                         m_state = State::ShowingScore;
                         m_scoreTimer = SCORE_DISPLAY_TIME;
                     }
@@ -182,35 +209,44 @@ namespace dae
                 // If we squashed a Sno-Bee we are done moving this frame
                 if (m_state == State::Sliding)
                 {
-                    // Walls and other ice blocks stop us (Sno-Bees handled above)
-                    if (!blocked && (nextRow != currentRow || nextCol != currentCol))
+                    // Look at the cell directly ahead of our centre — same test in every direction,
+                    // so right/down behave exactly like left/up.
+                    const glm::vec3 center = nextPos + glm::vec3(16.0f, 16.0f, 0.0f);
+                    const auto [curRow, curCol] = grid.WorldToGrid(center);
+                    const int aheadRow = curRow + static_cast<int>(m_slideDirection.y);
+                    const int aheadCol = curCol + static_cast<int>(m_slideDirection.x);
+
+                    bool aheadFree = grid.IsWithinBounds(aheadRow, aheadCol);
+                    if (aheadFree)
                     {
-                        if (!grid.IsWithinBounds(nextRow, nextCol))
+                        for (auto* obj : grid.GetObjectsAt(aheadRow, aheadCol))
                         {
-                            blocked = true;
-                        }
-                        else
-                        {
-                            for (auto* obj : grid.GetObjectsAt(nextRow, nextCol))
-                            {
-                                if (obj == this) continue;
-                                if (dynamic_cast<SnoBeeCharacter*>(obj)) continue;
-                                blocked = true;
-                                break;
-                            }
+                            if (obj == this) continue;
+                            if (dynamic_cast<SnoBeeCharacter*>(obj)) continue;
+                            aheadFree = false;
+                            break;
                         }
                     }
 
-                    if (blocked)
+                    if (aheadFree)
                     {
-                        // Stop, aligned to the tile we are currently in
-                        const auto [stopRow, stopCol] = grid.WorldToGrid(currentPos);
-                        SetLocalPosition(grid.GridToWorld(stopRow, stopCol));
-                        m_state = State::Idle;
+                        SetLocalPosition(nextPos);
                     }
                     else
                     {
-                        SetLocalPosition(nextPos);
+                        // Next cell is a wall or ice: glide until we line up with our current cell, then stop
+                        const glm::vec3 aligned = grid.GridToWorld(curRow, curCol);
+                        const float along = nextPos.x * m_slideDirection.x + nextPos.y * m_slideDirection.y;
+                        const float alignedAlong = aligned.x * m_slideDirection.x + aligned.y * m_slideDirection.y;
+                        if (along >= alignedAlong)
+                        {
+                            SetLocalPosition(aligned);
+                            m_state = State::Idle;
+                        }
+                        else
+                        {
+                            SetLocalPosition(nextPos);
+                        }
                     }
                 }
             }
@@ -225,13 +261,26 @@ namespace dae
         m_state = State::Idle;
         m_crushFrame = 0;
         m_crushTimer = 0.0f;
+        m_hasEgg = false;
+        m_isDiamond = false;
     }
 
     void IceBlock::Crush()
     {
-        m_state = State::Crushing;
+        if (m_isDiamond) return; // diamonds can only be pushed, never crushed
+
         m_crushFrame = 0;
         m_crushTimer = 0.0f;
+        if (m_hasEgg)
+        {
+            // Pengo smashed a reserve egg: play the egg-break animation, then award 500
+            m_hasEgg = false;
+            m_state = State::EggBreaking;
+        }
+        else
+        {
+            m_state = State::Crushing;
+        }
     }
 
     void IceBlock::Slide(const glm::vec2& direction)

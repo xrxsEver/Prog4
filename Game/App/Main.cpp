@@ -20,6 +20,7 @@
 #include "Achievements.h"
 #include "MazeDrawingComponent.h"
 #include "LivesIconComponent.h"
+#include "SnoBeeCounterComponent.h"
 #include "GameDebugUI.h"
 #include "ImGuiManager.h"
 
@@ -80,6 +81,12 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	lives->AddComponent<dae::LivesIconComponent>(resourceManager, pengoPtr);
 	lives->SetPosition(760, 120);
 	scene.Add(std::move(lives));
+
+	// Reserve Sno-Bee counter: stack of circles in the empty space on the right
+	auto snoBeeCounter = std::make_unique<dae::GameObject>("SnoBee Counter");
+	snoBeeCounter->AddComponent<dae::SnoBeeCounterComponent>(resourceManager, mazeComp);
+	snoBeeCounter->SetPosition(850, 120);
+	scene.Add(std::move(snoBeeCounter));
 
 	if (dae::Achievements *achievements = dae::Achievements::GetActiveInstance(); achievements != nullptr)
 	{

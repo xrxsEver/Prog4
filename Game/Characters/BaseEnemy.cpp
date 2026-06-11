@@ -61,7 +61,12 @@ namespace dae
         const auto objects = grid.GetObjectsAt(row, col);
         for (auto* obj : objects)
         {
-            if (dynamic_cast<IceBlock*>(obj)) return true;
+            if (auto* iceBlock = dynamic_cast<IceBlock*>(obj))
+            {
+                // Eggs and diamonds are off-limits to Sno-Bee crushing
+                if (iceBlock->HasEgg() || iceBlock->IsDiamond()) continue;
+                return true;
+            }
         }
 
         return false;
@@ -82,6 +87,7 @@ namespace dae
         {
             if (auto* iceBlock = dynamic_cast<IceBlock*>(obj))
             {
+                if (iceBlock->HasEgg() || iceBlock->IsDiamond()) continue; // never shatter eggs or diamonds
                 iceBlock->Crush(); // play the shatter animation, then it removes itself
                 return;
             }

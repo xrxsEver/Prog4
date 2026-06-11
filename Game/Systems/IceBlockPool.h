@@ -30,6 +30,9 @@ namespace dae
         [[nodiscard]] std::vector<glm::vec3> GetActivePositions() const;
         void Restore(const std::vector<glm::vec3>& positions);
 
+        // Find the active block sitting on a given tile (used to re-mark eggs after a respawn)
+        [[nodiscard]] IceBlock* FindActiveAt(const glm::vec3& pos) const;
+
         void Update(float deltaTime);
         void Render() const;
 

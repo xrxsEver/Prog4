@@ -2,6 +2,7 @@
 #include "Scene.h"
 #include "ResourceManager.h"
 #include <stdexcept>
+#include <cmath>
 
 namespace dae
 {
@@ -75,6 +76,20 @@ namespace dae
                 block->SetPosition(pos.x, pos.y);
             }
         }
+    }
+
+    IceBlock* IceBlockPool::FindActiveAt(const glm::vec3& pos) const
+    {
+        for (const auto& block : m_pool)
+        {
+            if (!block->IsActive()) continue;
+            const auto bp = block->GetLocalPosition();
+            if (std::abs(bp.x - pos.x) < 1.0f && std::abs(bp.y - pos.y) < 1.0f)
+            {
+                return block.get();
+            }
+        }
+        return nullptr;
     }
 
     void IceBlockPool::Update(float deltaTime)

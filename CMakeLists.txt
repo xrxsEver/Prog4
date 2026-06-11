@@ -183,6 +183,7 @@ set(GAME_SOURCES
   Game/Components/ScoreDisplayComponent.cpp
   Game/Components/MazeDrawingComponent.cpp
   Game/Components/LivesIconComponent.cpp
+  Game/Components/SnoBeeCounterComponent.cpp
 )
 
 set(GAME_INCLUDE_DIRS
