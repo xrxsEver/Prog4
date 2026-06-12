@@ -50,12 +50,6 @@ target_link_libraries(minigin_engine PUBLIC
   imgui
 )
 
-# Add Steamworks support if available
-if(Steamworks_FOUND)
-  target_link_libraries(minigin_engine PUBLIC Steamworks::Steamworks)
-  target_compile_definitions(minigin_engine PRIVATE USE_STEAMWORKS)
-endif()
-
 if (WIN32)
   target_link_libraries(minigin_engine PRIVATE xinput)
 endif()

@@ -1,0 +1,358 @@
+#include "GameController.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+
+#include "SceneManager.h"
+#include "Scene.h"
+#include "ResourceManager.h"
+#include "InputManager.h"
+#include "GameObject.h"
+#include "ServiceLocator.h"
+#include "CollisionGrid.h"
+
+#include "RenderComponent.h"
+#include "TextComponent.h"
+#include "FPSComponent.h"
+#include "CallbackComponent.h"
+
+#include "PengoCharacter.h"
+#include "MazeDrawingComponent.h"
+#include "BorderComponent.h"
+#include "LivesIconComponent.h"
+#include "SnoBeeCounterComponent.h"
+#include "ScoreDisplayComponent.h"
+#include "HighScoreDisplayComponent.h"
+#include "LevelDisplayComponent.h"
+
+#include "StartMenuComponent.h"
+#include "VersusControllerComponent.h"
+#include "MenuCommands.h"
+#include "CallbackCommand.h"
+
+namespace dae
+{
+    GameController::GameController(SceneManager& sceneManager, ResourceManager& resourceManager,
+                                  InputManager& inputManager, Scene& menuScene, Scene& gameScene)
+        : m_sceneManager(sceneManager)
+        , m_resourceManager(resourceManager)
+        , m_inputManager(inputManager)
+        , m_menuScene(menuScene)
+        , m_gameScene(gameScene)
+    {
+    }
+
+    void GameController::RequestMode(GameMode mode)
+    {
+        m_pending = Pending::EnterMode;
+        m_pendingMode = mode;
+    }
+
+    void GameController::RequestNextLevel()
+    {
+        m_pending = Pending::NextLevel;
+    }
+
+    void GameController::RequestMenu()
+    {
+        m_pending = Pending::ShowMenu;
+    }
+
+    void GameController::Tick()
+    {
+        // Clear the request before acting so a transition can safely queue another one.
+        const Pending pending = m_pending;
+        m_pending = Pending::None;
+
+        switch (pending)
+        {
+            // EnterMode/NextLevel tear the game scene down and rebuild it. When the pump that runs
+            // this lives in the very scene being rebuilt (a level skip / clear), doing it now would
+            // clear the object list mid-iteration — so defer to the end of the active scene's update.
+        case Pending::EnterMode:  { const GameMode mode = m_pendingMode; ScheduleRebuild([this, mode] { EnterMode(mode); }); break; }
+        case Pending::NextLevel:  ScheduleRebuild([this] { NextLevel(); }); break;
+        case Pending::ShowMenu:   ShowMenu(); break; // just swaps the active scene; safe immediately
+        case Pending::None:       break;
+        }
+    }
+
+    void GameController::ScheduleRebuild(std::function<void()> action)
+    {
+        if (Scene* active = m_sceneManager.GetActiveScene())
+        {
+            active->RunAfterUpdate(std::move(action));
+        }
+        else
+        {
+            action();
+        }
+    }
+
+    void GameController::BindMenuInput()
+    {
+        if (m_pMenu == nullptr)
+        {
+            return;
+        }
+
+        // Keyboard: W/S move, Space selects.
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Down, std::make_unique<MenuNavigateCommand>(*m_pMenu, -1));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Down, std::make_unique<MenuNavigateCommand>(*m_pMenu, 1));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_SPACE, KeyState::Down, std::make_unique<MenuConfirmCommand>(*m_pMenu));
+
+        // Any connected gamepad can drive the menu too: D-pad moves, A selects.
+        m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::DPadUp, KeyState::Down, std::make_unique<MenuNavigateCommand>(*m_pMenu, -1));
+        m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::DPadDown, KeyState::Down, std::make_unique<MenuNavigateCommand>(*m_pMenu, 1));
+        m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::A, KeyState::Down, std::make_unique<MenuConfirmCommand>(*m_pMenu));
+    }
+
+    void GameController::ShowMenu()
+    {
+        m_inputManager.ClearBindings();
+        BindMenuInput();
+        if (m_pMenu != nullptr)
+        {
+            m_pMenu->RefreshNow();
+        }
+        m_sceneManager.SetActiveScene(&m_menuScene);
+    }
+
+    void GameController::EnterMode(GameMode mode)
+    {
+        // A fresh mode always starts at its first level.
+        LoadLevel(mode, 1);
+    }
+
+    void GameController::NextLevel()
+    {
+        // F1 skip: step to the next level, or drop back to the menu once the mode is finished.
+        const int next = m_currentLevel + 1;
+        if (next > kLevelsPerMode)
+        {
+            ShowMenu();
+            return;
+        }
+        LoadLevel(m_currentMode, next);
+    }
+
+    void GameController::LoadLevel(GameMode mode, int level)
+    {
+        m_currentMode = mode;
+        m_currentLevel = level;
+
+        m_inputManager.ClearBindings();
+
+        // Clear the previous scene first (its grid objects unregister from the live grid), then
+        // swap in a fresh, empty collision grid for the new level.
+        m_gameScene.RemoveAll();
+        ServiceLocator::register_collision_grid(nullptr);
+
+        BuildGameScene(mode, level);
+
+        m_sceneManager.SetActiveScene(&m_gameScene);
+    }
+
+    const char* GameController::LevelFile(GameMode mode, int level)
+    {
+        // Each mode owns three level files; clamp so a stray index can't read out of bounds.
+        static const char* kSingle[kLevelsPerMode]  = { "single1.json", "single2.json", "single3.json" };
+        static const char* kCoop[kLevelsPerMode]    = { "coop1.json",   "coop2.json",   "coop3.json"   };
+        static const char* kVersus[kLevelsPerMode]  = { "versus1.json", "versus2.json", "versus3.json" };
+
+        const int i = std::min(std::max(level, 1), kLevelsPerMode) - 1;
+        switch (mode)
+        {
+        case GameMode::CoOp:   return kCoop[i];
+        case GameMode::Versus: return kVersus[i];
+        case GameMode::SinglePlayer:
+        default:               return kSingle[i];
+        }
+    }
+
+    void GameController::BindReturnToMenu()
+    {
+        // Escape (keyboard) or Start (any gamepad) drops back to the start menu.
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_ESCAPE, KeyState::Down,
+            std::make_unique<CallbackCommand>([this] { RequestMenu(); }));
+        m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::Start, KeyState::Down,
+            std::make_unique<CallbackCommand>([this] { RequestMenu(); }));
+
+        // F1 skips to the next level (and back to the menu after the last one).
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_F1, KeyState::Down,
+            std::make_unique<CallbackCommand>([this] { RequestNextLevel(); }));
+    }
+
+    void GameController::BuildGameScene(GameMode mode, int level)
+    {
+        Scene& scene = m_gameScene;
+
+        const bool coop = (mode == GameMode::CoOp);
+        const bool versus = (mode == GameMode::Versus);
+        const bool twoPlayers = coop || versus;
+        const char* levelFile = LevelFile(mode, level);
+
+        // --- Shared HUD furniture (logo, FPS) ---
+        auto canvas = std::make_unique<GameObject>("Canvas");
+        auto* canvasPtr = canvas.get();
+        scene.Add(std::move(canvas));
+
+        auto logo = std::make_unique<GameObject>("Logo");
+        logo->AddComponent<RenderComponent>(m_resourceManager)->SetTexture("logo.png");
+        logo->SetPosition(470, 428);
+        logo->SetParent(canvasPtr, false);
+        scene.Add(std::move(logo));
+
+        auto fpsFont = m_resourceManager.LoadFont("Lingua.otf", 16);
+        auto fps = std::make_unique<GameObject>("FPS Counter");
+        fps->AddComponent<TextComponent>("0 FPS", fpsFont, TextComponent::Color{ 255, 255, 255, 255 });
+        fps->AddComponent<FPSComponent>();
+        fps->SetPosition(500, 20);
+        fps->SetParent(canvasPtr, false);
+        scene.Add(std::move(fps));
+
+        // --- Automatic input policy: assign devices to players based on what's connected ---
+        std::vector<std::uint32_t> pads;
+        for (std::uint32_t i = 0; i < 4; ++i)
+        {
+            if (m_inputManager.IsGamepadConnected(i))
+            {
+                pads.push_back(i);
+            }
+        }
+
+        // Player one defaults to keyboard + the first pad (single player can use either).
+        PengoControls p1Controls{ true, !pads.empty(), pads.empty() ? 0u : pads[0] };
+        PengoControls p2Controls{};
+        if (twoPlayers)
+        {
+            if (pads.size() >= 2)
+            {
+                p1Controls = { true, true, pads[0] };   // keyboard + pad one
+                p2Controls = { false, true, pads[1] };  // second pad
+            }
+            else if (pads.size() == 1)
+            {
+                p1Controls = { true, false, 0 };         // keyboard only
+                p2Controls = { false, true, pads[0] };   // the single pad
+            }
+            else
+            {
+                p2Controls = { false, true, 0 };         // no pad (menu shouldn't allow this); P2 inert
+            }
+        }
+
+        // --- Player one (always a Pengo) ---
+        auto pengo = std::make_unique<PengoCharacter>(m_resourceManager);
+        auto* p1 = pengo.get();
+        p1->BindControls(m_inputManager, p1Controls);
+        pengo->SetPosition(-1000, -1000);
+
+        auto mazeIntro = std::make_unique<GameObject>("Maze Intro");
+        auto* mazeComp = mazeIntro->AddComponent<MazeDrawingComponent>(scene, m_resourceManager, levelFile,
+            [p1](glm::vec2 spawnPos) { p1->SetPosition(spawnPos.x, spawnPos.y); });
+        mazeComp->SetPengo(p1);
+
+        // Clearing the board (every Sno-Bee dead) advances to the next level, just like F1.
+        mazeComp->SetOnLevelComplete([this] { RequestNextLevel(); });
+
+        // Field border that rattles when a Pengo pushes into a wall (and stuns Sno-Bees along it).
+        auto* borderComp = mazeIntro->AddComponent<BorderComponent>(scene, m_resourceManager);
+        p1->SetBorder(borderComp);
+
+        mazeIntro->SetPosition(0, 0);
+        scene.Add(std::move(mazeIntro));
+
+        // --- Player two: co-op spawns a second Pengo; versus hijacks an AI Sno-Bee (see below) ---
+        // pengo2 is kept in a local and added to the scene LAST (see note below).
+        std::unique_ptr<PengoCharacter> pengo2;
+        PengoCharacter* p2 = nullptr;
+
+        if (coop)
+        {
+            pengo2 = std::make_unique<PengoCharacter>(m_resourceManager);
+            p2 = pengo2.get();
+            p2->BindControls(m_inputManager, p2Controls);
+            p2->SetSpriteRowOffset(4); // player two is the orange Pengo (sprite set starts at row 4)
+            p2->SetPosition(-1000, -1000);
+            p2->SetBorder(borderComp);
+            mazeComp->SetSecondPengo(p2);
+        }
+        else if (versus)
+        {
+            // Versus plays exactly like single player — the full AI swarm hatches — but player two
+            // hijacks one Sno-Bee at a time. The controller marks it with a ring and re-targets a
+            // living Sno-Bee whenever Pengo squashes the current one, so player two is never benched.
+            auto versusGo = std::make_unique<GameObject>("Versus Controller");
+            versusGo->AddComponent<VersusControllerComponent>(scene, m_inputManager, p2Controls.gamepadIndex);
+            scene.Add(std::move(versusGo));
+        }
+
+        // --- HUD (these observe the players, so add them before the players) ---
+        auto lives = std::make_unique<GameObject>("Lives");
+        lives->AddComponent<LivesIconComponent>(m_resourceManager, p1);
+        lives->SetPosition(760, 120);
+        scene.Add(std::move(lives));
+
+        if (p2 != nullptr)
+        {
+            auto lives2 = std::make_unique<GameObject>("Lives P2");
+            lives2->AddComponent<LivesIconComponent>(m_resourceManager, p2);
+            lives2->SetPosition(760, 160);
+            scene.Add(std::move(lives2));
+        }
+
+        auto snoBeeCounter = std::make_unique<GameObject>("SnoBee Counter");
+        snoBeeCounter->AddComponent<SnoBeeCounterComponent>(m_resourceManager, mazeComp);
+        snoBeeCounter->SetPosition(850, 120);
+        scene.Add(std::move(snoBeeCounter));
+
+        auto hudFont = m_resourceManager.LoadFont("PressStart2P-Regular.ttf", 16);
+
+        // Co-op shares one team score (the display sums every observed character).
+        std::vector<Character*> scoreChars{ p1 };
+        if (p2 != nullptr)
+        {
+            scoreChars.push_back(p2);
+        }
+
+        auto hiScore = std::make_unique<GameObject>("HighScore");
+        hiScore->AddComponent<TextComponent>("HI-SCORE: 0", hudFont, TextComponent::Color{ 255, 209, 0, 255 });
+        hiScore->AddComponent<HighScoreDisplayComponent>(p1, "HI-SCORE");
+        hiScore->SetPosition(500, 50);
+        scene.Add(std::move(hiScore));
+
+        auto scoreGo = std::make_unique<GameObject>("Score");
+        scoreGo->AddComponent<TextComponent>("SCORE: 0", hudFont, TextComponent::Color{ 255, 255, 255, 255 });
+        scoreGo->AddComponent<ScoreDisplayComponent>(scoreChars, std::string("SCORE"));
+        scoreGo->SetPosition(500, 78);
+        scene.Add(std::move(scoreGo));
+
+        auto levelGo = std::make_unique<GameObject>("Level");
+        levelGo->AddComponent<TextComponent>("LEVEL: 1", hudFont, TextComponent::Color{ 255, 255, 255, 255 });
+        levelGo->AddComponent<LevelDisplayComponent>(mazeComp, "LEVEL");
+        levelGo->SetPosition(500, 106);
+        scene.Add(std::move(levelGo));
+
+        // Players (Subjects) are added LAST. Scenes destroy objects front-to-back, and a Subject
+        // does not notify its observers when it dies, so the score/lives observers added above
+        // must be torn down before the players they point at (otherwise: use-after-free on replay).
+        scene.Add(std::move(pengo));
+        if (pengo2 != nullptr)
+        {
+            scene.Add(std::move(pengo2));
+        }
+
+        // Return-to-menu input, and the per-frame pump that carries out deferred transitions.
+        BindReturnToMenu();
+
+        auto pump = std::make_unique<GameObject>("Flow Pump");
+        pump->AddComponent<CallbackComponent>([this] { Tick(); });
+        scene.Add(std::move(pump));
+    }
+}

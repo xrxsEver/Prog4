@@ -1,6 +1,7 @@
 #include "SnoBeeCharacter.h"
 #include "GameObject.h"
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <glm/vec2.hpp>
@@ -9,7 +10,6 @@
 
 #include "AnalogStickMoveComponent.h"
 #include "AddScoreCommand.h"
-#include "InputManager.h"
 #include "LoseLifeCommand.h"
 #include "MoveCommand.h"
 #include "Component.h"
@@ -59,18 +59,22 @@ namespace
 
     int g_SnoBeeCounter = 0;
 
-    // Sno-Bee sprite layout: 16px frames starting at column 8, rows are
-    // 0 spawn / 1 move / 2 angry (ice crushing) / 3 die, each with 4 directions x 2 frames.
+    // Sno-Bee sprite layout: 16px frames. Each breed's block anchors at (spriteBaseRow, spriteBaseCol)
+    // from its SnoBeeType; the offsets below are relative to that anchor. Rows: 0 walk / 1 move /
+    // 2 angry (ice crushing) / 3 die, each with 4 directions x 2 frames. The default anchor (row 9,
+    // col 8) is used when a Sno-Bee has no type.
     constexpr float SNOBEE_SPRITE_SIZE = 16.0f;
-    constexpr int   SNOBEE_BASE_COL = 8;
+    constexpr int   SNOBEE_DEFAULT_ROW = 9;
+    constexpr int   SNOBEE_DEFAULT_COL = 8;
     constexpr int   SNOBEE_MOVE_ROW_OFFSET = 1;
     constexpr int   SNOBEE_ANGRY_ROW_OFFSET = 2;
     constexpr int   SNOBEE_DEATH_ROW_OFFSET = 3;
     constexpr float SNOBEE_ANIM_FRAME_TIME = 0.15f;
 
-    // The hatch animation lives on row 8; the two frames right after it are the dazed/stun pose
-    constexpr int   SNOBEE_SPAWN_ROW = 8;
-    constexpr int   SNOBEE_STUN_COL = SNOBEE_BASE_COL + 6; // cols 14/15
+    // The hatch animation sits one row above the walk row; the two frames at the block's far end
+    // (columns 6/7 of the block) are the dazed/stun pose.
+    constexpr int   SNOBEE_STUN_ROW_OFFSET = -1;
+    constexpr int   SNOBEE_STUN_COL_OFFSET = 6;
     constexpr float SNOBEE_STOMP_SCORE_TIME = 1.5f;        // how long the 100 lingers
 
     constexpr float SNOBEE_ICE_CRUSH_TIME = 1.0f; // long enough for the ice block's break animation
@@ -85,7 +89,10 @@ namespace
 dae::SnoBeeCharacter::SnoBeeCharacter(ResourceManager &resourceManager, const SnoBeeType* type)
     : BaseEnemy("SnoBee " + std::to_string(++g_SnoBeeCounter), resourceManager), m_pType(type)
 {
-    InitializeSprite(8 * 16.0f, 9 * 16.0f);
+    const int baseRow = type ? type->spriteBaseRow : SNOBEE_DEFAULT_ROW;
+    const int baseCol = type ? type->spriteBaseCol : SNOBEE_DEFAULT_COL;
+
+    InitializeSprite(baseCol * SNOBEE_SPRITE_SIZE, baseRow * SNOBEE_SPRITE_SIZE);
     ChangeState(EnemyState::Hatching);
 
     m_targetPosition = GetLocalPosition();
@@ -95,7 +102,7 @@ dae::SnoBeeCharacter::SnoBeeCharacter(ResourceManager &resourceManager, const Sn
     if (m_pType)
     {
         score = m_pType->scoreValue;
-        SetSpriteSourceRect(8 * 16.0f, static_cast<float>(9 + m_pType->spriteSheetRowOffset) * 16.0f, 16.0f, 16.0f);
+        SetSpriteSourceRect(baseCol * SNOBEE_SPRITE_SIZE, baseRow * SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE);
     }
 
     AddComponent<BaseEnemyUpdateComponent>();
@@ -142,6 +149,13 @@ void dae::SnoBeeCharacter::PerformAction(float dt)
         m_stunTimer -= dt;
         m_isMovingToTarget = false;
         UpdateAnimation(dt);
+        return;
+    }
+
+    // Versus: a human steers this Sno-Bee, so skip the AI think entirely
+    if (m_isPlayerControlled)
+    {
+        PerformPlayerAction(dt);
         return;
     }
 
@@ -219,7 +233,8 @@ int dae::SnoBeeCharacter::DirectionBaseFrame(const glm::vec2& dir) const
 
 void dae::SnoBeeCharacter::UpdateAnimation(float dt)
 {
-    const int baseRow = 9 + (m_pType ? m_pType->spriteSheetRowOffset : 0);
+    const int baseRow = m_pType ? m_pType->spriteBaseRow : SNOBEE_DEFAULT_ROW;
+    const int baseCol = m_pType ? m_pType->spriteBaseCol : SNOBEE_DEFAULT_COL;
 
     m_animTimer += dt;
     if (m_animTimer >= SNOBEE_ANIM_FRAME_TIME)
@@ -228,11 +243,11 @@ void dae::SnoBeeCharacter::UpdateAnimation(float dt)
         m_animFrame = (m_animFrame + 1) % 2;
     }
 
-    // Dazed: flicker the two stun frames that sit right after the hatch animation
+    // Dazed: flicker the two stun frames that sit just above the walk row
     if (m_currentState != EnemyState::Dead && m_stunTimer > 0.0f)
     {
-        const int stunCol = SNOBEE_STUN_COL + m_animFrame;
-        SetSpriteSourceRect(stunCol * SNOBEE_SPRITE_SIZE, SNOBEE_SPAWN_ROW * SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE);
+        const int stunCol = baseCol + SNOBEE_STUN_COL_OFFSET + m_animFrame;
+        SetSpriteSourceRect(stunCol * SNOBEE_SPRITE_SIZE, (baseRow + SNOBEE_STUN_ROW_OFFSET) * SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE);
         return;
     }
 
@@ -252,7 +267,7 @@ void dae::SnoBeeCharacter::UpdateAnimation(float dt)
         row = baseRow + SNOBEE_MOVE_ROW_OFFSET; // aggressive chase walk (row 10)
     }
 
-    const int col = SNOBEE_BASE_COL + DirectionBaseFrame(dir) + m_animFrame;
+    const int col = baseCol + DirectionBaseFrame(dir) + m_animFrame;
     SetSpriteSourceRect(col * SNOBEE_SPRITE_SIZE, row * SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE);
 }
 
@@ -449,20 +464,76 @@ void dae::SnoBeeCharacter::ChangeState(const EnemyState nextState)
     }
 }
 
-void dae::SnoBeeCharacter::BindGamepadControls(InputManager &inputManager, const std::uint32_t gamepadIndex)
+void dae::SnoBeeCharacter::SetPlayerControlled(bool controlled)
 {
-    float currentSpeed = m_pType ? m_pType->speed : 400.0f;
-    inputManager.BindGamepadCommand(gamepadIndex, Gamepad::Button::DPadUp, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0.0f, -1.0f}, currentSpeed));
-    inputManager.BindGamepadCommand(gamepadIndex, Gamepad::Button::DPadDown, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0.0f, 1.0f}, currentSpeed));
-    inputManager.BindGamepadCommand(gamepadIndex, Gamepad::Button::DPadLeft, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{-1.0f, 0.0f}, currentSpeed));
-    inputManager.BindGamepadCommand(gamepadIndex, Gamepad::Button::DPadRight, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{1.0f, 0.0f}, currentSpeed));
-    inputManager.BindGamepadCommand(gamepadIndex, Gamepad::Button::X, KeyState::Down, std::make_unique<LoseLifeCommand>(*this));
+    // Flipped by the versus coordinator: while on, the AI think is bypassed and movement
+    // follows held input. A hand-off starts with no direction held; the coordinator re-feeds
+    // whatever player two is currently pressing.
+    m_isPlayerControlled = controlled;
+    m_heldInputs.clear();
+}
 
-    int currentScore = m_pType ? m_pType->scoreValue : 100;
-    inputManager.BindGamepadCommand(gamepadIndex, Gamepad::Button::A, KeyState::Down, std::make_unique<AddScoreCommand>(*this, currentScore));
-    inputManager.BindGamepadCommand(gamepadIndex, Gamepad::Button::B, KeyState::Down, std::make_unique<AddScoreCommand>(*this, currentScore * 10));
+void dae::SnoBeeCharacter::AddInputDir(const glm::vec2& dir)
+{
+    if (std::find(m_heldInputs.begin(), m_heldInputs.end(), dir) == m_heldInputs.end())
+    {
+        m_heldInputs.push_back(dir);
+    }
+}
 
-    m_pMoveComponent = AddComponent<AnalogStickMoveComponent>(inputManager, gamepadIndex, currentSpeed);
+void dae::SnoBeeCharacter::RemoveInputDir(const glm::vec2& dir)
+{
+    m_heldInputs.erase(std::remove(m_heldInputs.begin(), m_heldInputs.end(), dir), m_heldInputs.end());
+}
+
+glm::vec2 dae::SnoBeeCharacter::CurrentInputDir() const
+{
+    return m_heldInputs.empty() ? glm::vec2{0.0f, 0.0f} : m_heldInputs.back();
+}
+
+void dae::SnoBeeCharacter::PerformPlayerAction(float dt)
+{
+    UpdateAnimation(dt);
+
+    if (m_currentState == EnemyState::Wandering || m_currentState == EnemyState::Chasing)
+    {
+        ProcessMovement(dt);
+        if (m_isMovingToTarget) return;
+
+        const glm::vec2 dir = CurrentInputDir();
+        if (dir.x == 0.0f && dir.y == 0.0f) return; // nothing held: stand still
+
+        m_currentDirection = dir;
+
+        if (IsTileWalkable(dir))
+        {
+            m_targetPosition = GetLocalPosition() + glm::vec3(dir.x, dir.y, 0.0f) * m_blockSize;
+            m_isMovingToTarget = true;
+            return;
+        }
+
+        // A player Sno-Bee can always crush ice to chase Pengo through the maze
+        if (IsTileIce(dir))
+        {
+            ChangeState(EnemyState::BreakingIce);
+            BreakBlockInDirection(dir);
+            m_breakIceTimer = SNOBEE_ICE_CRUSH_TIME;
+            return;
+        }
+        return; // wall ahead: blocked
+    }
+
+    if (m_currentState == EnemyState::BreakingIce)
+    {
+        m_breakIceTimer -= dt;
+        if (m_breakIceTimer <= 0.0f)
+        {
+            ChangeState(EnemyState::Chasing);
+            m_targetPosition = GetLocalPosition() + glm::vec3(m_currentDirection.x, m_currentDirection.y, 0.0f) * m_blockSize;
+            m_isMovingToTarget = true;
+        }
+        return;
+    }
 }
 
 std::unique_ptr<dae::SnoBeeCharacter> dae::SnoBeeCharacter::Clone() const
@@ -478,7 +549,7 @@ std::unique_ptr<dae::SnoBeeCharacter> dae::SnoBeeCharacter::Spawn(const SnoBeeCh
     {
         cloned->m_pType = type;
         cloned->score = type->scoreValue;
-        cloned->SetSpriteSourceRect(8 * 16.0f, static_cast<float>(9 + type->spriteSheetRowOffset) * 16.0f, 16.0f, 16.0f);
+        cloned->SetSpriteSourceRect(type->spriteBaseCol * SNOBEE_SPRITE_SIZE, type->spriteBaseRow * SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE);
 
         if (cloned->m_pMoveComponent)
         {

@@ -5,6 +5,7 @@
 #include <glm/vec3.hpp>
 #include <vector>
 #include <memory>
+#include <cstdint>
 
 namespace dae
 {
@@ -13,6 +14,15 @@ namespace dae
     class RenderComponent;
     class PengoState;
     class BorderComponent;
+
+    // Which devices drive a single Pengo. The same Pengo can listen to the keyboard and a
+    // gamepad at once (player one in the automatic input policy), or just one of them.
+    struct PengoControls
+    {
+        bool keyboard{false};
+        bool gamepad{false};
+        std::uint32_t gamepadIndex{0};
+    };
 
     // Enum to represent Pengo's facing direction
     enum class PengoDirection
@@ -47,7 +57,8 @@ namespace dae
         void UpdateStateMachine();
         void ApplyStateSwap();
 
-        void BindKeyboardControls(InputManager& inputManager);
+        // Bind movement + push for this Pengo to the requested device(s).
+        void BindControls(InputManager& inputManager, const PengoControls& controls);
 
         // Let Pengo rattle the field border when he pushes straight into a wall
         void SetBorder(BorderComponent* pBorder) { m_pBorder = pBorder; }
@@ -67,6 +78,10 @@ namespace dae
         void Push();
 
         void SetSpriteData(int row, int startCol, bool isMoving);
+
+        // Co-op: shift this Pengo to a different palette set in pengo.png (player two is the
+        // orange Pengo whose rows start at 5). The per-state rows are relative to this offset.
+        void SetSpriteRowOffset(int offset);
 
         // --- Latest Key Priority Movement ---
         void AddMoveInput(PengoDirection direction);
@@ -99,6 +114,7 @@ namespace dae
         // float m_animationTimer{0.0f};
         // int m_currentFrame{0};
         int m_spriteRow{0};
+        int m_spriteRowOffset{0};   // 0 for player one, 5 for the orange player-two Pengo
         int m_spriteStartCol{0};
         bool m_isMoving{false};
 

@@ -1,6 +1,8 @@
 ﻿#include <stdexcept>
 #include <cstring>
 #include <iostream>
+#include <array>
+#include <cmath>
 #include <SDL3/SDL.h>
 #include <imgui.h>
 #include <backends/imgui_impl_sdl3.h>
@@ -103,6 +105,21 @@ void dae::Renderer::RenderFilledRect(float x, float y, float width, float height
 	SDL_SetRenderDrawColor(m_renderer.get(), color.r, color.g, color.b, color.a);
 	SDL_FRect r{x, y, width, height};
 	SDL_RenderFillRect(m_renderer.get(), &r);
+}
+
+void dae::Renderer::RenderCircle(float cx, float cy, float radius, const Color &color) const
+{
+	// Outline only, traced as a closed loop of short line segments (no SDL circle primitive)
+	SDL_SetRenderDrawColor(m_renderer.get(), color.r, color.g, color.b, color.a);
+
+	constexpr int segments = 40;
+	std::array<SDL_FPoint, segments + 1> points{};
+	for (int i = 0; i <= segments; ++i)
+	{
+		const float angle = (static_cast<float>(i) / segments) * 2.0f * 3.14159265f;
+		points[i] = SDL_FPoint{ cx + std::cos(angle) * radius, cy + std::sin(angle) * radius };
+	}
+	SDL_RenderLines(m_renderer.get(), points.data(), static_cast<int>(points.size()));
 }
 
 void dae::Renderer::InitImGui() const

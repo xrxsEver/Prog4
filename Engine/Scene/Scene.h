@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -18,6 +19,12 @@ namespace dae
 		void RemoveAll();
 		const std::vector<std::unique_ptr<GameObject>> &GetObjects() const { return m_objects; }
 
+		// Queue a callback to run once at the very end of the next Update, after all objects have
+		// updated and the delete-sweep has run. This is the safe place to tear down/rebuild a scene
+		// from inside one of its own objects (e.g. a level transition), where clearing the object
+		// list mid-iteration would be a use-after-free.
+		void RunAfterUpdate(std::function<void()> action);
+
 		void Update(float deltaTime);
 		void FixedUpdate();
 		void Render() const;
@@ -35,6 +42,7 @@ namespace dae
 
 		std::vector<std::unique_ptr<GameObject>> m_objects{};
 		std::vector<std::unique_ptr<GameObject>> m_objectsToAdd{};
+		std::vector<std::function<void()>> m_afterUpdate{};
         std::unique_ptr<SnoBeeManager> m_snoBeeManager;
 	};
 

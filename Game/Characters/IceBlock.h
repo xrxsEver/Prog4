@@ -73,6 +73,7 @@ namespace dae
         static constexpr int EGG_BREAK_FRAMES = 6;         // misc.png row 5 holds the egg-break frames
         static constexpr float EGG_BREAK_ROW_Y = 64.0f;
         static constexpr float EGG_BREAK_FRAME_TIME = 0.18f; // a touch slower than a normal shatter
+        static constexpr int EGG_BREAK_SCORE = 500;        // points for smashing an un-hatched reserve egg
         static constexpr float SLIDE_SPEED = 250.0f;
         static constexpr float SCORE_DISPLAY_TIME = 3.0f;
     };

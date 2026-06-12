@@ -19,13 +19,15 @@ namespace dae
         const int rows = static_cast<int>(layout.size());
         const int cols = rows > 0 ? static_cast<int>(layout[0].get<std::string>().size()) : 0;
 
-        GenerationResult result{
-            std::vector<std::vector<TileType>>(rows, std::vector<TileType>(cols, TileType::EMPTY)),
-            {},
-            {0, 0},
-            rows,
-            cols
-        };
+        GenerationResult result;
+        result.grid = std::vector<std::vector<TileType>>(rows, std::vector<TileType>(cols, TileType::EMPTY));
+        result.rows = rows;
+        result.cols = cols;
+
+        // Per-level tuning lives alongside the layout; missing keys fall back to the defaults
+        result.levelNumber = jsonData.value("level", 1);
+        result.snoBeeCount = jsonData.value("snoBeeCount", 12);
+        result.snoBeeSpeed = jsonData.value("snoBeeSpeed", 200.0f);
 
         for (int r = 0; r < rows; ++r)
         {
@@ -44,7 +46,11 @@ namespace dae
                 else if (tileChar == 'P')
                 {
                     result.grid[r][c] = TileType::EMPTY;
-                    result.pengoSpawn = {r, c};
+                    if (result.pengoSpawns.empty())
+                    {
+                        result.pengoSpawn = {r, c}; // first spawn drives single-player callers
+                    }
+                    result.pengoSpawns.push_back({r, c});
                     result.carvingSequence.push_back({r, c});
                 }
                 else if (tileChar == '#')

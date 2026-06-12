@@ -8,11 +8,27 @@
 #include "Scene.h"
 #include "SnoBeeCharacter.h"
 #include "PengoCharacter.h"
-#include "TypeRegistry.h"
 #include "CollisionGrid.h"
 #include <algorithm>
 #include <array>
 #include <random>
+#include <utility>
+
+namespace
+{
+    // The Sno-Bee sprite block (row, col) into pengo.png, keyed by level number and shared across
+    // all game modes. Kept in code (not JSON) so there's a single obvious place to retune it.
+    // pengo.png is 40x18 cells of 16px, so these stay on-sheet. Tweak the values here per level.
+    std::pair<int, int> SnoBeeSpriteForLevel(int level)
+    {
+        switch (level)
+        {
+        case 2:  return { 9, 16 };
+        case 3:  return { 13, 32 };
+        default: return { 9, 8 };   // level 1 (and any fallback)
+        }
+    }
+}
 
 namespace dae
 {
@@ -38,7 +54,22 @@ namespace dae
         m_rows = result.rows;
         m_cols = result.cols;
 
+        // Per-level tuning: HUD number, Sno-Bee pool size and speed come from the JSON; the sprite
+        // block is picked in code by level number (see SnoBeeSpriteForLevel). Score stays Basic 100.
+        m_levelNumber = result.levelNumber;
+        m_totalSnoBees = result.snoBeeCount;
+        m_snoBeeReserve = m_totalSnoBees;
+        const auto [spriteRow, spriteCol] = SnoBeeSpriteForLevel(m_levelNumber);
+        m_levelSnoBeeType = SnoBeeType{ result.snoBeeSpeed, 100, spriteRow, spriteCol, AITier::Basic, false };
+
         m_pengoSpawnPos = GetScreenPos(result.pengoSpawn.first, result.pengoSpawn.second);
+
+        // Co-op levels carry a second 'P'; remember it so the maze can place/respawn player two.
+        if (result.pengoSpawns.size() > 1)
+        {
+            m_pengoSpawnPos2 = GetScreenPos(result.pengoSpawns[1].first, result.pengoSpawns[1].second);
+            m_hasSecondSpawn = true;
+        }
 
         m_offsetX = 0.0f;
         m_offsetY = 0.0f;
@@ -90,6 +121,7 @@ namespace dae
 
         if (m_isFinished)
         {
+            UpdateRedFlash(deltaTime); // keep the reserve eggs blinking while the opening wave hatches
             AdvanceSpawnAnimation(deltaTime);
             return;
         }
@@ -129,13 +161,14 @@ namespace dae
                     }
                 }
 
-                if (iceBlockIndices.size() >= 3)
+                const int waveSize = std::min(OPENING_WAVE, m_totalSnoBees);
+                if (m_enemiesEnabled && waveSize > 0 && static_cast<int>(iceBlockIndices.size()) >= waveSize)
                 {
                     std::random_device rd;
                     std::mt19937 g(rd());
                     std::shuffle(iceBlockIndices.begin(), iceBlockIndices.end(), g);
-                    
-                    for (int i = 0; i < 3; ++i)
+
+                    for (int i = 0; i < waveSize; ++i)
                     {
                         const int index = iceBlockIndices[i];
                         m_spawnBlockIndices.push_back(index);
@@ -151,13 +184,20 @@ namespace dae
                     m_spawnStep = SpawnStep::IceBreaking;
                     m_spawnAnimationFrame = 0;
                     m_spawnAnimationTimer = 0.0f;
+
+                    // Lay the diamonds and reserve eggs out now (not after the wave) so the rest
+                    // are already blinking while the opening three hatch. The wave itself isn't an
+                    // egg, so it doesn't count toward the reserve laid out here.
+                    SetupDiamonds();
+                    SetupReserveEggs(m_snoBeeReserve - static_cast<int>(m_spawnBlockIndices.size()));
                 }
                 else
                 {
                     if (m_onFinished) m_onFinished(m_pengoSpawnPos);
+                    if (m_pPengo2 && m_hasSecondSpawn) m_pPengo2->SetPosition(m_pengoSpawnPos2.x, m_pengoSpawnPos2.y);
                     m_phase = LevelPhase::Playing; // no hatch to play, straight to gameplay
                     SetupDiamonds();
-                    SetupReserveEggs();
+                    SetupReserveEggs(m_snoBeeReserve);
                 }
             }
         }
@@ -167,8 +207,8 @@ namespace dae
     {
         m_pIceBlockPool->Update(deltaTime);
 
-        // Pengo dying kicks off the life-lost sequence
-        if (m_pPengo && m_pPengo->IsDying())
+        // Either Pengo dying kicks off the life-lost sequence (co-op resets the field for both)
+        if ((m_pPengo && m_pPengo->IsDying()) || (m_pPengo2 && m_pPengo2->IsDying()))
         {
             StartDeathSequence();
             return;
@@ -179,10 +219,14 @@ namespace dae
         // Lining the three diamonds up grants a one-off bonus and stuns every Sno-Bee
         CheckDiamondLine();
 
-        // Pengo may have smashed an egg; drop those from the reserve and the side counter
+        // Pengo may have smashed an egg; drop those from the reserve and the side counter.
+        // Surviving eggs ride inside their ice block, so keep each one's tracked tile under
+        // the block — that way it hatches (and flashes) wherever Pengo pushed it, not back
+        // at its starting cell. (Maze tile r,c is one cell in from the collision grid.)
+        const auto& grid = ServiceLocator::get_collision_grid();
         for (auto it = m_eggBlocks.begin(); it != m_eggBlocks.end(); )
         {
-            const auto& b = m_blocks[*it];
+            auto& b = m_blocks[*it];
             if (b.pPooledBlock != nullptr && !b.pPooledBlock->HasEgg())
             {
                 if (m_snoBeeReserve > 0) --m_snoBeeReserve;
@@ -190,6 +234,12 @@ namespace dae
             }
             else
             {
+                if (b.pPooledBlock != nullptr && !b.pPooledBlock->IsSliding())
+                {
+                    const auto [gridRow, gridCol] = grid.WorldToGrid(b.pPooledBlock->GetWorldPosition());
+                    b.r = gridRow + 1;
+                    b.c = gridCol + 1;
+                }
                 ++it;
             }
         }
@@ -221,6 +271,13 @@ namespace dae
                     BeginReserveHatch();
                 }
             }
+        }
+
+        // Level cleared: the whole reserve is spent and not a single Sno-Bee is left on the field.
+        if (!m_levelComplete && m_snoBeeReserve == 0 && m_spawnStep == SpawnStep::None && !AnySnoBeeAlive())
+        {
+            m_levelComplete = true;
+            if (m_onLevelComplete) m_onLevelComplete();
         }
     }
 
@@ -298,6 +355,10 @@ namespace dae
         {
             m_pPengo->Respawn({ m_pengoSpawnPos.x, m_pengoSpawnPos.y, 0.0f });
         }
+        if (m_pPengo2 && m_hasSecondSpawn)
+        {
+            m_pPengo2->Respawn({ m_pengoSpawnPos2.x, m_pengoSpawnPos2.y, 0.0f });
+        }
 
         // Hatch the same number of Sno-Bees that were alive before
         SpawnSnoBees(m_rememberedSnoBeeCount);
@@ -312,6 +373,7 @@ namespace dae
         {
             if (auto* snoBee = dynamic_cast<SnoBeeCharacter*>(obj.get()))
             {
+                if (snoBee->IsPlayerControlled()) continue; // versus: never clear player two's Sno-Bee
                 if (!snoBee->IsMarkedForDelete())
                 {
                     ++count;
@@ -320,6 +382,20 @@ namespace dae
             }
         }
         return count;
+    }
+
+    bool MazeDrawingComponent::AnySnoBeeAlive() const
+    {
+        // Counts dying Sno-Bees too (still on screen until swept), so the level only ends once the
+        // last squash animation has finished.
+        for (const auto& obj : m_scene.GetObjects())
+        {
+            if (auto* snoBee = dynamic_cast<SnoBeeCharacter*>(obj.get()); snoBee && !snoBee->IsMarkedForDelete())
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     void MazeDrawingComponent::SpawnSnoBees(int count)
@@ -333,6 +409,7 @@ namespace dae
             const auto& b = m_blocks[i];
             if (b.type != TileType::EMPTY) continue;
             if (GetScreenPos(b.r, b.c) == m_pengoSpawnPos) continue; // keep Pengo's tile clear
+            if (m_hasSecondSpawn && GetScreenPos(b.r, b.c) == m_pengoSpawnPos2) continue; // and player two's
             freeCells.push_back(i);
         }
         if (freeCells.empty()) return;
@@ -341,7 +418,7 @@ namespace dae
         std::mt19937 g(rd());
         std::shuffle(freeCells.begin(), freeCells.end(), g);
 
-        const SnoBeeType* basicType = TypeRegistry::GetInstance().GetSnoBeeType("Basic");
+        const SnoBeeType* basicType = &m_levelSnoBeeType;
         for (int k = 0; k < count; ++k)
         {
             const auto& b = m_blocks[freeCells[k % freeCells.size()]];
@@ -381,8 +458,8 @@ namespace dae
                 {
                     m_spawnStep = SpawnStep::Finished;
 
-                    // Hatch a Sno-Bee at every animating block
-                    const SnoBeeType* basicType = TypeRegistry::GetInstance().GetSnoBeeType("Basic");
+                    // Hatch a Sno-Bee at every animating block, as this level's breed
+                    const SnoBeeType* basicType = &m_levelSnoBeeType;
                     for (const int index : m_spawnBlockIndices)
                     {
                         auto& b = m_blocks[index];
@@ -404,11 +481,11 @@ namespace dae
 
                     if (!m_hatchingReserve)
                     {
-                        // First wave just finished: hand over to gameplay, then lay out diamonds and eggs
+                        // Opening wave finished: the diamonds and eggs were already laid out when it
+                        // started, so just hand control over to gameplay.
                         if (m_onFinished) m_onFinished(m_pengoSpawnPos);
+                        if (m_pPengo2 && m_hasSecondSpawn) m_pPengo2->SetPosition(m_pengoSpawnPos2.x, m_pengoSpawnPos2.y);
                         m_phase = LevelPhase::Playing;
-                        SetupDiamonds();
-                        SetupReserveEggs();
                     }
                     m_hatchingReserve = false;
                 }
@@ -417,9 +494,11 @@ namespace dae
         return true;
     }
 
-    void MazeDrawingComponent::SetupReserveEggs()
+    void MazeDrawingComponent::SetupReserveEggs(int count)
     {
-        // Scatter the remaining reserve across random surviving ice blocks; they flash red until they hatch
+        if (count <= 0) return;
+
+        // Scatter `count` reserve Sno-Bees across random surviving ice blocks; they blink red until they hatch
         std::vector<int> iceCells;
         for (int i = 0; i < static_cast<int>(m_blocks.size()); ++i)
         {
@@ -434,7 +513,7 @@ namespace dae
         std::mt19937 g(rd());
         std::shuffle(iceCells.begin(), iceCells.end(), g);
 
-        const int eggCount = std::min(m_snoBeeReserve, static_cast<int>(iceCells.size()));
+        const int eggCount = std::min(count, static_cast<int>(iceCells.size()));
         for (int i = 0; i < eggCount; ++i)
         {
             auto& b = m_blocks[iceCells[i]];
@@ -610,15 +689,23 @@ namespace dae
 
         m_pIceBlockPool->Render();
 
-        // Just before a hatch, every remaining egg flashes its red square together
-        if (m_phase == LevelPhase::Playing && m_eggsFlashing && m_redFlashOn)
+        // Eggs flash red only at two moments: during the opening wave (so you spot the reserve as
+        // the first three hatch) and for the ~2s before each reserve egg hatches.
+        const bool eggsFlashNow = (m_phase == LevelPhase::Intro) || (m_phase == LevelPhase::Playing && m_eggsFlashing);
+        if (eggsFlashNow && m_redFlashOn)
         {
             const Rect redSrc = { 32.0f, 0.0f, 16.0f, 16.0f }; // red cell in misc.png's top row
             for (const int index : m_eggBlocks)
             {
                 const auto& b = m_blocks[index];
                 if (b.removed) continue;
-                const glm::vec2 screenPos = GetScreenPos(b.r, b.c);
+                // Track the egg's ice block so the blink follows a pushed egg, not its old tile
+                glm::vec2 screenPos = GetScreenPos(b.r, b.c);
+                if (b.pPooledBlock)
+                {
+                    const glm::vec3 blockPos = b.pPooledBlock->GetLocalPosition();
+                    screenPos = { blockPos.x, blockPos.y };
+                }
                 renderer.RenderTexture(*m_miscTexture, redSrc, worldPos.x + screenPos.x, worldPos.y + screenPos.y, m_blockSize, m_blockSize);
             }
         }

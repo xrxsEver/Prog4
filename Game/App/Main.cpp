@@ -7,29 +7,24 @@
 #include "Minigin.h"
 #include "SceneManager.h"
 #include "ResourceManager.h"
+#include "InputManager.h"
+#include "Scene.h"
 #include "GameObject.h"
 #include "RenderComponent.h"
 #include "TextComponent.h"
-#include "FPSComponent.h"
-#include "InputManager.h"
-#include "MoveCommand.h"
-#include "Scene.h"
-#include "PengoCharacter.h"
-#include "SnoBeeCharacter.h"
-#include "TypeRegistry.h"
-#include "Achievements.h"
-#include "MazeDrawingComponent.h"
-#include "BorderComponent.h"
-#include "LivesIconComponent.h"
-#include "SnoBeeCounterComponent.h"
-#include "ScoreDisplayComponent.h"
-#include "HighScoreDisplayComponent.h"
-#include "LevelDisplayComponent.h"
+
+#include "GameMode.h"
+#include "GameController.h"
+#include "StartMenuComponent.h"
+#include "CallbackComponent.h"
+
 #include "GameDebugUI.h"
 #include "ImGuiManager.h"
 
+#include <array>
+#include <memory>
+#include <string>
 #include <filesystem>
-#include <vector>
 
 #include "ServiceLocator.h"
 #include "SDLSoundSystem.h"
@@ -39,89 +34,64 @@ namespace fs = std::filesystem;
 
 static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resourceManager, dae::InputManager &inputManager)
 {
-	auto &scene = sceneManager.CreateScene();
-	auto canvas = std::make_unique<dae::GameObject>("Canvas");
-	auto *canvasPtr = canvas.get();
-	scene.Add(std::move(canvas));
+	// Two scenes: the start menu (active first) and an initially-empty scene the chosen mode
+	// is built into. The GameController switches between them.
+	auto &menuScene = sceneManager.CreateScene();
+	auto &gameScene = sceneManager.CreateScene();
 
-	// logo
-	auto go = std::make_unique<dae::GameObject>();
-	go->SetName("Logo");
-	go->AddComponent<dae::RenderComponent>(resourceManager)->SetTexture("logo.png");
-	go->SetPosition(470, 428);
-	go->SetParent(canvasPtr, false);
-	scene.Add(std::move(go));
+	// The flow coordinator outlives any single scene; the active scene pumps its Tick().
+	static std::unique_ptr<dae::GameController> s_controller;
+	s_controller = std::make_unique<dae::GameController>(sceneManager, resourceManager, inputManager, menuScene, gameScene);
+	auto *gc = s_controller.get();
 
-	// fps counter
-	auto fpsFont = resourceManager.LoadFont("Lingua.otf", 16);
-	go = std::make_unique<dae::GameObject>();
-	go->SetName("FPS Counter");
-	go->AddComponent<dae::TextComponent>("0 FPS", fpsFont, dae::TextComponent::Color{255, 255, 255, 255});
-	go->AddComponent<dae::FPSComponent>();
-	go->SetPosition(500, 20);
-	go->SetParent(canvasPtr, false);
-	scene.Add(std::move(go));
+	// --- Start menu UI ---
+	auto menuCanvas = std::make_unique<dae::GameObject>("Menu Canvas");
+	auto *menuCanvasPtr = menuCanvas.get();
+	menuScene.Add(std::move(menuCanvas));
 
-	inputManager.ClearBindings();
+	auto logo = std::make_unique<dae::GameObject>("Menu Logo");
+	logo->AddComponent<dae::RenderComponent>(resourceManager)->SetTexture("logo.png");
+	logo->SetPosition(362, 90);
+	logo->SetParent(menuCanvasPtr, false);
+	menuScene.Add(std::move(logo));
 
-	auto pengo = std::make_unique<dae::PengoCharacter>(resourceManager);
-	auto *pengoPtr = pengo.get();
-	pengo->BindKeyboardControls(inputManager);
-	pengo->SetPosition(-1000, -1000);
+	auto menuFont = resourceManager.LoadFont("PressStart2P-Regular.ttf", 20);
+	auto smallFont = resourceManager.LoadFont("PressStart2P-Regular.ttf", 10);
 
-	auto mazeIntro = std::make_unique<dae::GameObject>("Maze Intro");
-	auto *mazeComp = mazeIntro->AddComponent<dae::MazeDrawingComponent>(scene, resourceManager, "level1.json", [pengoPtr](glm::vec2 pengoSpawnPos)
-													   {
-														   pengoPtr->SetPosition(pengoSpawnPos.x, pengoSpawnPos.y);
-													   });
-	mazeComp->SetPengo(pengoPtr); // let the maze drive the death / respawn sequence
-
-	// Field border that rattles when Pengo pushes into a wall (and stuns Sno-Bees along it)
-	auto *borderComp = mazeIntro->AddComponent<dae::BorderComponent>(scene, resourceManager);
-	pengoPtr->SetBorder(borderComp);
-
-	mazeIntro->SetPosition(0, 0);
-	scene.Add(std::move(mazeIntro));
-
-	scene.Add(std::move(pengo));
-
-	// Lives display in the empty space to the right of the playfield
-	auto lives = std::make_unique<dae::GameObject>("Lives");
-	lives->AddComponent<dae::LivesIconComponent>(resourceManager, pengoPtr);
-	lives->SetPosition(760, 120);
-	scene.Add(std::move(lives));
-
-	// Reserve Sno-Bee counter: stack of circles in the empty space on the right
-	auto snoBeeCounter = std::make_unique<dae::GameObject>("SnoBee Counter");
-	snoBeeCounter->AddComponent<dae::SnoBeeCounterComponent>(resourceManager, mazeComp);
-	snoBeeCounter->SetPosition(850, 120);
-	scene.Add(std::move(snoBeeCounter));
-
-	// HUD text (PressStart2P arcade font): high score, score and level, stacked on the right
-	auto hudFont = resourceManager.LoadFont("PressStart2P-Regular.ttf", 16);
-
-	auto hiScore = std::make_unique<dae::GameObject>("HighScore");
-	hiScore->AddComponent<dae::TextComponent>("HI-SCORE: 0", hudFont, dae::TextComponent::Color{255, 209, 0, 255});
-	hiScore->AddComponent<dae::HighScoreDisplayComponent>(pengoPtr, "HI-SCORE");
-	hiScore->SetPosition(500, 50);
-	scene.Add(std::move(hiScore));
-
-	auto scoreGo = std::make_unique<dae::GameObject>("Score");
-	scoreGo->AddComponent<dae::TextComponent>("SCORE: 0", hudFont, dae::TextComponent::Color{255, 255, 255, 255});
-	scoreGo->AddComponent<dae::ScoreDisplayComponent>(std::vector<dae::Character*>{pengoPtr}, std::string("SCORE"));
-	scoreGo->SetPosition(500, 78);
-	scene.Add(std::move(scoreGo));
-
-	auto levelGo = std::make_unique<dae::GameObject>("Level");
-	levelGo->AddComponent<dae::TextComponent>("LEVEL: 1", hudFont, dae::TextComponent::Color{255, 255, 255, 255});
-	levelGo->AddComponent<dae::LevelDisplayComponent>(mazeComp, "LEVEL");
-	levelGo->SetPosition(500, 106);
-	scene.Add(std::move(levelGo));
-
-	if (dae::Achievements *achievements = dae::Achievements::GetActiveInstance(); achievements != nullptr)
+	const char *names[dae::kGameModeCount] = {"SINGLE PLAYER", "CO-OP", "VERSUS"};
+	std::array<dae::TextComponent *, dae::kGameModeCount> labels{};
+	for (int i = 0; i < dae::kGameModeCount; ++i)
 	{
-		achievements->ObserveCharacter(pengoPtr);
+		auto row = std::make_unique<dae::GameObject>("Menu Row");
+		labels[i] = row->AddComponent<dae::TextComponent>(std::string("  ") + names[i], menuFont, dae::TextComponent::Color{255, 255, 255, 255});
+		row->SetPosition(330.f, 250.f + static_cast<float>(i) * 44.f);
+		menuScene.Add(std::move(row));
 	}
+
+	auto menuObj = std::make_unique<dae::GameObject>("Start Menu");
+	auto *menuComp = menuObj->AddComponent<dae::StartMenuComponent>(inputManager, labels,
+																	[gc](dae::GameMode mode)
+																	{ gc->RequestMode(mode); });
+	menuScene.Add(std::move(menuObj));
+
+	gc->SetMenu(menuComp);
+	gc->BindMenuInput();
+
+	auto hint = std::make_unique<dae::GameObject>("Menu Hint");
+	hint->AddComponent<dae::TextComponent>("W/S + SPACE   OR   D-PAD + A", smallFont, dae::TextComponent::Color{160, 160, 160, 255});
+	hint->SetPosition(250, 470);
+	menuScene.Add(std::move(hint));
+
+	auto hint2 = std::make_unique<dae::GameObject>("Menu Hint 2");
+	hint2->AddComponent<dae::TextComponent>("CONNECT A CONTROLLER FOR CO-OP / VERSUS", smallFont, dae::TextComponent::Color{160, 160, 160, 255});
+	hint2->SetPosition(190, 500);
+	menuScene.Add(std::move(hint2));
+
+	// While the menu is the active scene, this pump carries out deferred mode transitions.
+	auto menuPump = std::make_unique<dae::GameObject>("Flow Pump");
+	menuPump->AddComponent<dae::CallbackComponent>([gc]
+												   { gc->Tick(); });
+	menuScene.Add(std::move(menuPump));
 
 	dae::GameDebugUI::RegisterCustomTabs(dae::ImGuiManager::GetInstance());
 }

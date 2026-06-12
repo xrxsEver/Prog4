@@ -42,8 +42,6 @@ namespace dae
         GameObject *m_pSelectedGameObject{};
         bool m_isWindowOpen{true};
         float m_sceneHierarchyHeight{260.0f};
-        bool m_confirmResetAllStats{};
-        std::string m_achievementActionFeedback{};
         SceneManager *m_pSceneManager{};
         InputManager *m_pInputManager{};
         std::vector<std::pair<std::string, std::function<void()>>> m_customTabs;

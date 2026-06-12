@@ -8,6 +8,7 @@
 #include <string>
 #include "MazeGenerator.h"
 #include "IceBlockPool.h"
+#include "SnoBeeType.h"
 
 namespace dae
 {
@@ -59,21 +60,24 @@ namespace dae
         // Hook Pengo up so the maze can react when he dies, and so blocks can credit kills
         void SetPengo(PengoCharacter* pPengo) { m_pPengo = pPengo; if (m_pIceBlockPool) m_pIceBlockPool->SetPlayer(pPengo); }
 
+        // Co-op: a second Pengo the maze also places, watches for death, and respawns.
+        void SetSecondPengo(PengoCharacter* pPengo) { m_pPengo2 = pPengo; }
+
+        // Fired once when the level is cleared (whole reserve spent, no Sno-Bee left alive).
+        void SetOnLevelComplete(std::function<void()> cb) { m_onLevelComplete = std::move(cb); }
+
+        // Versus: stop the maze hatching its own Sno-Bees (player two brings the only one).
+        void SetEnemiesEnabled(bool enabled) { m_enemiesEnabled = enabled; if (!enabled) m_snoBeeReserve = 0; }
+
+        // Where the second player starts (the level's second 'P' tile), if there is one.
+        glm::vec2 GetSecondPengoSpawn() const { return m_pengoSpawnPos2; }
+        bool HasSecondSpawn() const { return m_hasSecondSpawn; }
+
         // How many Sno-Bees are still waiting in the reserve (drives the on-screen counter)
         int GetSnoBeeReserve() const { return m_snoBeeReserve; }
 
-        // Current level number, pulled from the level filename ("level1.json" -> 1)
-        int GetLevelNumber() const
-        {
-            int number = 0;
-            bool found = false;
-            for (char ch : m_levelFile)
-            {
-                if (ch >= '0' && ch <= '9') { number = number * 10 + (ch - '0'); found = true; }
-                else if (found) break;
-            }
-            return found ? number : 1;
-        }
+        // Current level number, read from the level JSON's "level" field
+        int GetLevelNumber() const { return m_levelNumber; }
 
         const char* GetDebugName() const override { return "Maze Drawing Component"; }
         std::unique_ptr<Component> Clone(GameObject* pOwner) const override;
@@ -90,11 +94,12 @@ namespace dae
         void StartDeathSequence();
         void BeginRespawn();
         int ClearSnoBees();          // remove every Sno-Bee, return how many were alive
+        bool AnySnoBeeAlive() const; // is any Sno-Bee still on the field (incl. dying ones)?
         void SpawnSnoBees(int count);
 
         // Reserve Sno-Bees wait as red eggs on the ice, then hatch one at a time with the spawn animation
         bool AdvanceSpawnAnimation(float deltaTime); // steps the ice-break / hatch animation, spawns on finish
-        void SetupReserveEggs();                     // scatter the remaining reserve as flashing red eggs
+        void SetupReserveEggs(int count);            // scatter `count` reserve Sno-Bees as blinking red eggs
         void BeginReserveHatch();                    // hatch one egg with the spawn animation, removing its ice block
         void UpdateRedFlash(float deltaTime);
 
@@ -113,6 +118,8 @@ namespace dae
         std::vector<MazeBlock> m_blocks{};
         std::vector<int> m_removalOrder{};
         std::function<void(glm::vec2)> m_onFinished{};
+        std::function<void()> m_onLevelComplete{};
+        bool m_levelComplete = false;        // fired the one-shot clear callback already?
         std::string m_levelFile;
         glm::vec2 m_pengoSpawnPos{0, 0};
 
@@ -136,15 +143,24 @@ namespace dae
 
         // --- Level flow / life-lost sequence ---
         PengoCharacter* m_pPengo = nullptr;
+        PengoCharacter* m_pPengo2 = nullptr;             // co-op second player (optional)
+        glm::vec2 m_pengoSpawnPos2{0, 0};
+        bool m_hasSecondSpawn = false;
+        bool m_enemiesEnabled = true;                    // versus turns the AI Sno-Bee spawns off
         LevelPhase m_phase = LevelPhase::Intro;
         float m_wipeProgress = 0.0f;                 // how far the black slide has fallen (pixels)
         float m_holdTimer = 0.0f;
         int m_rememberedSnoBeeCount = 0;
         std::vector<glm::vec3> m_blockSnapshot{};    // remembered ice-block positions
 
-        // A level has a fixed pool of Sno-Bees; the first wave hatches 3, the rest wait in reserve
-        static constexpr int TOTAL_SNOBEES = 12;
-        int m_snoBeeReserve = TOTAL_SNOBEES;
+        // Per-level tuning, all read from the level JSON in the constructor
+        int m_levelNumber = 1;
+        int m_totalSnoBees = 12;          // size of this level's Sno-Bee pool
+        SnoBeeType m_levelSnoBeeType{};   // the breed every Sno-Bee spawns as (speed + sprite per level)
+
+        // The first wave hatches up to OPENING_WAVE Sno-Bees, the rest wait in reserve
+        static constexpr int OPENING_WAVE = 3;
+        int m_snoBeeReserve = m_totalSnoBees;
 
         // The reserve trickles out one at a time: sit idle, flash all eggs for a moment, then hatch one
         float m_hatchTimer = HATCH_INTERVAL - PRE_SPAWN_FLASH;

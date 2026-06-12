@@ -19,7 +19,6 @@ namespace dae
         Dead
     };
 
-    class InputManager;
     class ResourceManager;
     class AnalogStickMoveComponent;
     class ScorePopupComponent;
@@ -30,8 +29,6 @@ namespace dae
         explicit SnoBeeCharacter(ResourceManager &resourceManager, const SnoBeeType* type);
         ~SnoBeeCharacter() override;
 
-        void BindGamepadControls(InputManager &inputManager, std::uint32_t gamepadIndex);
-
         // Killed by a sliding ice block; remembers the squash direction for the death sprite
         void CrushFrom(const glm::vec2& squashDirection);
         // Hold still for a moment while a sliding ice block carries us along
@@ -41,6 +38,16 @@ namespace dae
         bool IsStunned() const;
         // Stomped while stunned: go down, pop a score, and leave Pengo unharmed
         void KillByPlayer();
+
+        // Versus: a coordinator hijacks this Sno-Bee for player two (and lets go when it dies).
+        bool IsPlayerControlled() const { return m_isPlayerControlled; }
+        void SetPlayerControlled(bool controlled);
+        void AddInputDir(const glm::vec2& dir);
+        void RemoveInputDir(const glm::vec2& dir);
+
+        // State queries the versus coordinator uses to pick its next live Sno-Bee
+        bool IsDead() const { return m_currentState == EnemyState::Dead || health <= 0; }
+        bool IsHatching() const { return m_currentState == EnemyState::Hatching; }
 
         std::unique_ptr<SnoBeeCharacter> Clone() const;
 
@@ -66,6 +73,10 @@ namespace dae
         // ones (chasing) can crush ice. The flag flips on a randomised timer.
         bool m_isAggressive{false};
         float m_aggroTimer{0.0f};
+
+        // Versus: when player-controlled the AI is bypassed and movement follows held input
+        bool m_isPlayerControlled{false};
+        std::vector<glm::vec2> m_heldInputs; // latest-key-priority direction stack
 
         float m_stunTimer{0.0f}; // counts down while a sliding block is carrying us
 
@@ -94,6 +105,10 @@ namespace dae
         void Think();
         void ChasePlayer();
         void Wander();
+
+        // Versus: the currently held input direction (zero when nothing is pressed)
+        glm::vec2 CurrentInputDir() const;
+        void PerformPlayerAction(float dt);
 
         std::vector<glm::vec2> GetValidDirections() const;
         glm::vec2 GetRandomValidDirection(const std::vector<glm::vec2>& validDirs, const glm::vec2& preferredDir = {0.f, 0.f}) const;

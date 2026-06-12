@@ -1,4 +1,7 @@
 {
+  "level": 1,
+  "snoBeeCount": 8,
+  "snoBeeSpeed": 160,
   "layout": [
     "WWWWWWWWWWWWWWW",
     "W#B###B#####B#W",
@@ -9,7 +12,7 @@
     "W#B#BBBBBBB#B#W",
     "W#B###BP##B#B#W",
     "W#BBB#BBB#B#B#W",
-    "W#B#B#B###B###W",
+    "W#B#B#BP##B###W",
     "W#B#B#B###B###W",
     "W###B###B###B#W",
     "W#B#BBB#B#BBB#W",

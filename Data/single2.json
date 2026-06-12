@@ -1,0 +1,24 @@
+{
+  "level": 2,
+  "snoBeeCount": 10,
+  "snoBeeSpeed": 220,
+  "layout": [
+    "WWWWWWWWWWWWWWW",
+    "W#BB#BB#BB#BB#W",
+    "W#BB#BB#BB#BB#W",
+    "W##P########B#W",
+    "W#BBBBB#BBBBB#W",
+    "W#B###B#B###B#W",
+    "W#B#BB###BB#B#W",
+    "W#B#B#####B#B#W",
+    "W#B#B#BBB#B#B#W",
+    "W#B#B#B#B#B#B#W",
+    "W#B#B#B#B#B#B#W",
+    "W#BBB#B#B#BBB#W",
+    "W#####B#B#####W",
+    "W#BBBBB#BBBBB#W",
+    "W#B#######B#B#W",
+    "W#BB#BB#BB#BB#W",
+    "WWWWWWWWWWWWWWW"
+  ]
+}

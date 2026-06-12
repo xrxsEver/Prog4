@@ -136,10 +136,12 @@ namespace dae
                     if (m_crushFrame >= EGG_BREAK_FRAMES)
                     {
                         // Egg finished breaking: flash the 500 (first row, last column of scores.png)
+                        // and bank those points, just like a Sno-Bee squash does.
                         m_scoreSrcRect = Rect{ 80.0f, 0.0f, 16.0f, 16.0f };
                         m_removeAfterScore = true;
                         m_scoreTimer = SCORE_DISPLAY_TIME;
                         m_state = State::ShowingScore;
+                        if (m_pPengo) m_pPengo->AddScore(EGG_BREAK_SCORE);
                     }
                 }
             }

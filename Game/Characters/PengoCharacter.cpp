@@ -67,22 +67,45 @@ namespace dae
     {
     }
 
-    void PengoCharacter::BindKeyboardControls(InputManager& inputManager)
+    void PengoCharacter::BindControls(InputManager& inputManager, const PengoControls& controls)
     {
-        // Directional Movement - Pressed
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0, -1}, MOVE_SPEED));
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0, 1}, MOVE_SPEED));
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{-1, 0}, MOVE_SPEED));
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{1, 0}, MOVE_SPEED));
+        if (controls.keyboard)
+        {
+            // Directional Movement - Pressed
+            inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0, -1}, MOVE_SPEED));
+            inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0, 1}, MOVE_SPEED));
+            inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{-1, 0}, MOVE_SPEED));
+            inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{1, 0}, MOVE_SPEED));
 
-        // Directional Movement - Released
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{0, -1}));
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{0, 1}));
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{-1, 0}));
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{1, 0}));
+            // Directional Movement - Released
+            inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{0, -1}));
+            inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{0, 1}));
+            inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{-1, 0}));
+            inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{1, 0}));
 
-        // Action - Push
-        inputManager.BindKeyboardCommand(SDL_SCANCODE_SPACE, KeyState::Down, std::make_unique<PushCommand>(*this));
+            // Action - Push
+            inputManager.BindKeyboardCommand(SDL_SCANCODE_SPACE, KeyState::Down, std::make_unique<PushCommand>(*this));
+        }
+
+        if (controls.gamepad)
+        {
+            const std::uint32_t pad = controls.gamepadIndex;
+
+            // Directional Movement - Pressed (D-pad)
+            inputManager.BindGamepadCommand(pad, Gamepad::Button::DPadUp, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0, -1}, MOVE_SPEED));
+            inputManager.BindGamepadCommand(pad, Gamepad::Button::DPadDown, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{0, 1}, MOVE_SPEED));
+            inputManager.BindGamepadCommand(pad, Gamepad::Button::DPadLeft, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{-1, 0}, MOVE_SPEED));
+            inputManager.BindGamepadCommand(pad, Gamepad::Button::DPadRight, KeyState::Pressed, std::make_unique<MoveCommand>(*this, glm::vec2{1, 0}, MOVE_SPEED));
+
+            // Directional Movement - Released
+            inputManager.BindGamepadCommand(pad, Gamepad::Button::DPadUp, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{0, -1}));
+            inputManager.BindGamepadCommand(pad, Gamepad::Button::DPadDown, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{0, 1}));
+            inputManager.BindGamepadCommand(pad, Gamepad::Button::DPadLeft, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{-1, 0}));
+            inputManager.BindGamepadCommand(pad, Gamepad::Button::DPadRight, KeyState::Up, std::make_unique<MoveReleaseCommand>(*this, glm::vec2{1, 0}));
+
+            // Action - Push (A button)
+            inputManager.BindGamepadCommand(pad, Gamepad::Button::A, KeyState::Down, std::make_unique<PushCommand>(*this));
+        }
     }
 
     void PengoCharacter::UpdateStateMachine()
@@ -123,6 +146,14 @@ namespace dae
         m_isMoving = isMoving;
     }
 
+    void PengoCharacter::SetSpriteRowOffset(int offset)
+    {
+        m_spriteRowOffset = offset;
+        // Refresh the resting frame so the right palette shows before the first step
+        // (UpdateRenderComponent only takes over once a state has set an animation frame).
+        SetSpriteSourceRect(0.f, static_cast<float>(offset) * SPRITE_SIZE, SPRITE_SIZE, SPRITE_SIZE);
+    }
+
     void PengoCharacter::UpdateRenderComponent()
     {
         if (!m_pRenderComponent) return;
@@ -130,7 +161,7 @@ namespace dae
 
         m_pRenderComponent->SetSourceRect(
             m_animationFrame * SPRITE_SIZE,
-            m_spriteRow * SPRITE_SIZE,
+            (m_spriteRowOffset + m_spriteRow) * SPRITE_SIZE,
             SPRITE_SIZE,
             SPRITE_SIZE
         );

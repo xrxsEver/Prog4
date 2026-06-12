@@ -151,17 +151,13 @@ if (WIN32)
   find_package(VLD CONFIG)
 endif()
 
-# Add steam if available
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/steam")
-find_package(Steamworks QUIET)
-
 # Build the Engine library
 add_subdirectory(Engine)
 
 # Game sources
 set(GAME_SOURCES
   Game/App/Main.cpp
-  Game/Systems/Achievements.cpp
+  Game/App/GameController.cpp
   Game/Systems/CollisionGrid.cpp
   Game/Systems/MazeGenerator.cpp
   Game/Systems/IceBlockPool.cpp
@@ -188,6 +184,8 @@ set(GAME_SOURCES
   Game/Components/ScorePopupComponent.cpp
   Game/Components/HighScoreDisplayComponent.cpp
   Game/Components/LevelDisplayComponent.cpp
+  Game/Components/StartMenuComponent.cpp
+  Game/Components/VersusControllerComponent.cpp
 )
 
 set(GAME_INCLUDE_DIRS
@@ -216,12 +214,6 @@ target_link_libraries("${TARGET_NAME}" PUBLIC
   minigin_engine
   nlohmann_json::nlohmann_json
 )
-
-# Add Steamworks support if available
-if(Steamworks_FOUND)
-  target_link_libraries("${TARGET_NAME}" PUBLIC Steamworks::Steamworks)
-  target_compile_definitions(${TARGET_NAME} PRIVATE USE_STEAMWORKS)
-endif()
 
 if(WIN32 AND NOT EMSCRIPTEN)
   target_link_libraries("${TARGET_NAME}" PRIVATE xinput)
@@ -278,17 +270,6 @@ elseif(WIN32)
     )
   endforeach()
 
-  if(Steamworks_FOUND)
-    target_link_libraries("${TARGET_NAME}" PUBLIC Steamworks::Steamworks)
-    target_compile_definitions(${TARGET_NAME} PRIVATE USE_STEAMWORKS)
-    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E copy "${Steamworks_RUNTIME_DLL}" "$<TARGET_FILE_DIR:${TARGET_NAME}>")
-    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E echo "480" > "$<TARGET_FILE_DIR:${TARGET_NAME}>/steam_appid.txt"
-      COMMENT "Generating steam_appid.txt"
-    )
-  endif()
-
   # Always copy Data folder to output directory to ensure it is up-to-date
   add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/Data" "$<TARGET_FILE_DIR:${TARGET_NAME}>/Data"
@@ -307,35 +288,11 @@ elseif(APPLE)
     COMMAND install_name_tool -change "@rpath/libSDL3.0.dylib" "@executable_path/../Frameworks/libSDL3.0.dylib" "$<TARGET_FILE:${TARGET_NAME}>"
   )
 
-  if(Steamworks_FOUND)
-    target_link_libraries("${TARGET_NAME}" PUBLIC Steamworks::Steamworks)
-    target_compile_definitions(${TARGET_NAME} PRIVATE USE_STEAMWORKS)
-    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${Steamworks_LIBRARIES}" "$<TARGET_BUNDLE_DIR:${TARGET_NAME}>/Contents/Frameworks/"
-    )
-    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E echo "480" > "$<TARGET_FILE_DIR:${TARGET_NAME}>/steam_appid.txt"
-      COMMENT "Generating steam_appid.txt"
-    )
-  endif()
-
   # Copy Data folder to output directory after build
   add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/Data" "$<TARGET_FILE_DIR:${TARGET_NAME}>/Data"
   )
 else()
- if(Steamworks_FOUND)
-    target_link_libraries("${TARGET_NAME}" PUBLIC Steamworks::Steamworks)
-    target_compile_definitions(${TARGET_NAME} PRIVATE USE_STEAMWORKS)
-    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${Steamworks_LIBRARIES}" "$<TARGET_FILE_DIR:${TARGET_NAME}>"
-    )
-    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E echo "480" > "$<TARGET_FILE_DIR:${TARGET_NAME}>/steam_appid.txt"
-      COMMENT "Generating steam_appid.txt"
-    )
-  endif()
-
   # Copy Data folder to output directory after build
   add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/Data" "$<TARGET_FILE_DIR:${TARGET_NAME}>/Data"
