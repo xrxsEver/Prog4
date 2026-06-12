@@ -7,10 +7,31 @@
 #include "CollisionGrid.h"
 #include "GameTime.h"
 #include "SnoBeeCharacter.h"
+#include "PengoCharacter.h"
 #include <cmath>
+#include <vector>
+#include <algorithm>
 
 namespace dae
 {
+    // Squashing Sno-Bees with a sliding block scores from the "blue" row of scores.png:
+    // 1 caught -> 400, 2 -> 1600, 3 -> 3200, 4+ -> 6400 (row 1, columns 1..4).
+    static Rect SquashScoreRect(int count)
+    {
+        const int idx = std::min(std::max(count, 1), 4);
+        return Rect{ static_cast<float>(idx) * 16.0f, 16.0f, 16.0f, 16.0f };
+    }
+
+    static int SquashScorePoints(int count)
+    {
+        switch (std::min(std::max(count, 1), 4))
+        {
+        case 1:  return 400;
+        case 2:  return 1600;
+        case 3:  return 3200;
+        default: return 6400;
+        }
+    }
     IceBlock::IceBlock(ResourceManager& resourceManager)
         : GameObject("IceBlock")
     {
@@ -166,36 +187,49 @@ namespace dae
                     const float beeAlong = beePos.x * m_slideDirection.x + beePos.y * m_slideDirection.y;
                     if (pushedAlong <= beeAlong) continue; // we haven't caught up to it yet
 
-                    // Is the tile it would be pushed into blocked?
-                    glm::vec3 pushedLead = pushedPos;
-                    if (m_slideDirection.x > 0) pushedLead.x += 31.0f;
-                    else if (m_slideDirection.y > 0) pushedLead.y += 31.0f;
-                    const auto [pr, pc] = grid.WorldToGrid(pushedLead);
-
-                    bool aheadBlocked = !grid.IsWithinBounds(pr, pc);
-                    if (!aheadBlocked)
+                    // Walk the line of Sno-Bees ahead of us. If it dead-ends at a wall or another
+                    // ice block the whole line is pinned and gets squashed together.
+                    const auto [beeRow, beeCol] = grid.WorldToGrid(beeCenter);
+                    std::vector<SnoBeeCharacter*> line;
+                    int lr = beeRow, lc = beeCol;
+                    bool pinned = false;
+                    while (true)
                     {
-                        for (auto* o : grid.GetObjectsAt(pr, pc))
+                        if (!grid.IsWithinBounds(lr, lc)) { pinned = true; break; } // ran into the wall
+                        SnoBeeCharacter* here = nullptr;
+                        bool iceAhead = false;
+                        for (auto* o : grid.GetObjectsAt(lr, lc))
                         {
-                            if (dynamic_cast<IceBlock*>(o)) { aheadBlocked = true; break; }
+                            if (o == this) continue;
+                            if (auto* s = dynamic_cast<SnoBeeCharacter*>(o))
+                            {
+                                if (s->health > 0 && !s->IsMarkedForDelete()) here = s;
+                            }
+                            else if (dynamic_cast<IceBlock*>(o)) iceAhead = true;
                         }
+                        if (iceAhead) { pinned = true; break; }   // line ends against an ice block
+                        if (!here)    { pinned = false; break; }  // free tile: the line can still slide
+                        line.push_back(here);
+                        lr += static_cast<int>(m_slideDirection.y);
+                        lc += static_cast<int>(m_slideDirection.x);
                     }
 
-                    if (aheadBlocked)
+                    if (pinned)
                     {
-                        // Pinned against the obstacle: squash it, then settle onto its tile and
-                        // flash the score there before turning back into a normal block.
-                        const auto [beeRow, beeCol] = grid.WorldToGrid(beeCenter);
-                        snoBee->CrushFrom(m_slideDirection);
+                        // Squash every Sno-Bee in the line, settle on the nearest one's tile, and
+                        // flash the matching blue score there before turning back into a block.
+                        for (auto* s : line) s->CrushFrom(m_slideDirection);
                         SetLocalPosition(grid.GridToWorld(beeRow, beeCol));
-                        m_scoreSrcRect = Rect{ 16.0f, 16.0f, 16.0f, 16.0f }; // blue 400
-                        m_removeAfterScore = false;                          // settle back into a normal block
+                        const int n = static_cast<int>(line.size());
+                        m_scoreSrcRect = SquashScoreRect(n);
+                        m_removeAfterScore = false;
                         m_state = State::ShowingScore;
                         m_scoreTimer = SCORE_DISPLAY_TIME;
+                        if (m_pPengo) m_pPengo->AddScore(SquashScorePoints(n));
                     }
                     else
                     {
-                        // Carry it along and keep its AI from steering off while shoved
+                        // Free space ahead: carry the nearest one along and stop its AI steering off
                         snoBee->SetPosition(pushedPos.x, pushedPos.y);
                         snoBee->Stun(0.15f);
                         if (auto* gridComp = snoBee->GetComponent<GridObjectComponent>())
@@ -203,7 +237,7 @@ namespace dae
                             gridComp->SyncToCurrentPosition();
                         }
                     }
-                    break; // one passenger at a time
+                    break; // handled the line in front of us
                 }
 
                 // If we squashed a Sno-Bee we are done moving this frame
@@ -267,7 +301,8 @@ namespace dae
 
     void IceBlock::Crush()
     {
-        if (m_isDiamond) return; // diamonds can only be pushed, never crushed
+        if (m_isDiamond) return;            // diamonds can only be pushed, never crushed
+        if (m_state != State::Idle) return; // already crushing/sliding/scoring — ignore repeat presses
 
         m_crushFrame = 0;
         m_crushTimer = 0.0f;

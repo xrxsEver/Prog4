@@ -11,6 +11,8 @@
 #include "CollisionGrid.h"
 #include "IceBlock.h"
 #include "BaseEnemy.h"
+#include "SnoBeeCharacter.h"
+#include "BorderComponent.h"
 #include <iostream>
 
 namespace dae
@@ -136,6 +138,11 @@ namespace dae
 
     void PengoCharacter::Push()
     {
+        // Only shove in the direction we are actively heading: a bare Space press does nothing,
+        // you push south with S + Space, etc. (face forward first).
+        if (m_activeMoveInputs.empty()) return;
+        m_currentDirection = m_activeMoveInputs.back();
+
         glm::vec3 directionVec{0, 0, 0};
         switch (m_currentDirection)
         {
@@ -150,7 +157,28 @@ namespace dae
         const glm::vec3 tileAheadPos = currentPos + directionVec * m_blockSize;
 
         const auto [rowAhead, colAhead] = grid.WorldToGrid(tileAheadPos);
-        if (!grid.IsWithinBounds(rowAhead, colAhead)) return;
+        if (!grid.IsWithinBounds(rowAhead, colAhead))
+        {
+            // Pushing straight into the surrounding wall: rattle that border and stun the
+            // Sno-Bees pinned along it, then play Pengo's push animation.
+            if (m_pBorder)
+            {
+                BorderComponent::Edge edge = BorderComponent::Edge::None;
+                switch (m_currentDirection)
+                {
+                case PengoDirection::Up:    edge = BorderComponent::Edge::Top;    break;
+                case PengoDirection::Down:  edge = BorderComponent::Edge::Bottom; break;
+                case PengoDirection::Left:  edge = BorderComponent::Edge::Left;   break;
+                case PengoDirection::Right: edge = BorderComponent::Edge::Right;  break;
+                }
+                m_pBorder->Push(edge);
+            }
+
+            m_pCurrentState->OnExit(this);
+            m_pCurrentState = std::make_unique<PushingState>();
+            m_pCurrentState->OnEnter(this);
+            return;
+        }
 
         IceBlock* pIceBlockAhead = nullptr;
         const auto objectsAhead = grid.GetObjectsAt(rowAhead, colAhead);
@@ -236,16 +264,27 @@ namespace dae
 
     void PengoCharacter::CheckEnemyCollision()
     {
+        constexpr int SNOBEE_STOMP_SCORE = 100;
+
         const auto& grid = ServiceLocator::get_collision_grid();
         const auto [row, col] = grid.WorldToGrid(GetWorldPosition());
         for (auto* obj : grid.GetObjectsAt(row, col))
         {
-            // Only living enemies are dangerous (dead/squashed ones are harmless)
-            if (auto* enemy = dynamic_cast<BaseEnemy*>(obj); enemy && enemy->health > 0)
+            // Only living enemies matter (dead/squashed ones are harmless)
+            auto* enemy = dynamic_cast<BaseEnemy*>(obj);
+            if (!enemy || enemy->health <= 0) continue;
+
+            // A dazed Sno-Bee gets stomped for points instead of killing us
+            if (auto* snoBee = dynamic_cast<SnoBeeCharacter*>(enemy); snoBee && snoBee->IsStunned())
             {
-                Die();
-                return;
+                snoBee->KillByPlayer();
+                AddScore(SNOBEE_STOMP_SCORE);
+                continue;
             }
+
+            // Any other live enemy is lethal
+            Die();
+            return;
         }
     }
 

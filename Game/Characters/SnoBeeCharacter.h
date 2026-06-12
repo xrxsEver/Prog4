@@ -22,6 +22,7 @@ namespace dae
     class InputManager;
     class ResourceManager;
     class AnalogStickMoveComponent;
+    class ScorePopupComponent;
 
     class SnoBeeCharacter final : public BaseEnemy
     {
@@ -36,6 +37,11 @@ namespace dae
         // Hold still for a moment while a sliding ice block carries us along
         void Stun(float duration);
 
+        // Dazed and helpless: a player who touches us now finishes us off instead of dying
+        bool IsStunned() const;
+        // Stomped while stunned: go down, pop a score, and leave Pengo unharmed
+        void KillByPlayer();
+
         std::unique_ptr<SnoBeeCharacter> Clone() const;
 
         static std::unique_ptr<SnoBeeCharacter> Spawn(const SnoBeeCharacter& prototype, const SnoBeeType* type);
@@ -46,6 +52,7 @@ namespace dae
     private:
         const SnoBeeType* m_pType{};
         AnalogStickMoveComponent* m_pMoveComponent{};
+        ScorePopupComponent* m_pScorePopup{};
 
         EnemyState m_currentState{EnemyState::Hatching};
 
@@ -55,9 +62,10 @@ namespace dae
         glm::vec3 m_targetPosition{};
         bool m_isMovingToTarget{false};
 
-        // A Sno-Bee can't crush ice when it hatches; it earns the ability after a short random wait
-        bool m_canCrushIce{false};
-        float m_crushAbilityTimer{0.0f};
+        // Sno-Bees drift between calm wandering and aggressive chasing; only the aggressive
+        // ones (chasing) can crush ice. The flag flips on a randomised timer.
+        bool m_isAggressive{false};
+        float m_aggroTimer{0.0f};
 
         float m_stunTimer{0.0f}; // counts down while a sliding block is carrying us
 

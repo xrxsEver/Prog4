@@ -19,8 +19,12 @@
 #include "TypeRegistry.h"
 #include "Achievements.h"
 #include "MazeDrawingComponent.h"
+#include "BorderComponent.h"
 #include "LivesIconComponent.h"
 #include "SnoBeeCounterComponent.h"
+#include "ScoreDisplayComponent.h"
+#include "HighScoreDisplayComponent.h"
+#include "LevelDisplayComponent.h"
 #include "GameDebugUI.h"
 #include "ImGuiManager.h"
 
@@ -71,6 +75,11 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 														   pengoPtr->SetPosition(pengoSpawnPos.x, pengoSpawnPos.y);
 													   });
 	mazeComp->SetPengo(pengoPtr); // let the maze drive the death / respawn sequence
+
+	// Field border that rattles when Pengo pushes into a wall (and stuns Sno-Bees along it)
+	auto *borderComp = mazeIntro->AddComponent<dae::BorderComponent>(scene, resourceManager);
+	pengoPtr->SetBorder(borderComp);
+
 	mazeIntro->SetPosition(0, 0);
 	scene.Add(std::move(mazeIntro));
 
@@ -87,6 +96,27 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 	snoBeeCounter->AddComponent<dae::SnoBeeCounterComponent>(resourceManager, mazeComp);
 	snoBeeCounter->SetPosition(850, 120);
 	scene.Add(std::move(snoBeeCounter));
+
+	// HUD text (PressStart2P arcade font): high score, score and level, stacked on the right
+	auto hudFont = resourceManager.LoadFont("PressStart2P-Regular.ttf", 16);
+
+	auto hiScore = std::make_unique<dae::GameObject>("HighScore");
+	hiScore->AddComponent<dae::TextComponent>("HI-SCORE: 0", hudFont, dae::TextComponent::Color{255, 209, 0, 255});
+	hiScore->AddComponent<dae::HighScoreDisplayComponent>(pengoPtr, "HI-SCORE");
+	hiScore->SetPosition(500, 50);
+	scene.Add(std::move(hiScore));
+
+	auto scoreGo = std::make_unique<dae::GameObject>("Score");
+	scoreGo->AddComponent<dae::TextComponent>("SCORE: 0", hudFont, dae::TextComponent::Color{255, 255, 255, 255});
+	scoreGo->AddComponent<dae::ScoreDisplayComponent>(std::vector<dae::Character*>{pengoPtr}, std::string("SCORE"));
+	scoreGo->SetPosition(500, 78);
+	scene.Add(std::move(scoreGo));
+
+	auto levelGo = std::make_unique<dae::GameObject>("Level");
+	levelGo->AddComponent<dae::TextComponent>("LEVEL: 1", hudFont, dae::TextComponent::Color{255, 255, 255, 255});
+	levelGo->AddComponent<dae::LevelDisplayComponent>(mazeComp, "LEVEL");
+	levelGo->SetPosition(500, 106);
+	scene.Add(std::move(levelGo));
 
 	if (dae::Achievements *achievements = dae::Achievements::GetActiveInstance(); achievements != nullptr)
 	{

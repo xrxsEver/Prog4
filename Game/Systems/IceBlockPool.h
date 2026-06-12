@@ -8,12 +8,16 @@ namespace dae
 {
     class Scene;
     class ResourceManager;
+    class PengoCharacter;
 
     class IceBlockPool final
     {
     public:
         explicit IceBlockPool(Scene& scene, ResourceManager& resourceManager, size_t poolSize = 200);
         ~IceBlockPool() = default;
+
+        // Tell every block who to credit when it squashes Sno-Bees
+        void SetPlayer(PengoCharacter* pPengo);
 
         IceBlockPool(const IceBlockPool&) = delete;
         IceBlockPool& operator=(const IceBlockPool&) = delete;

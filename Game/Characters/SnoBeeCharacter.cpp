@@ -14,6 +14,7 @@
 #include "MoveCommand.h"
 #include "Component.h"
 #include "GridObjectComponent.h"
+#include "ScorePopupComponent.h"
 #include "ServiceLocator.h"
 
 namespace dae
@@ -67,9 +68,18 @@ namespace
     constexpr int   SNOBEE_DEATH_ROW_OFFSET = 3;
     constexpr float SNOBEE_ANIM_FRAME_TIME = 0.15f;
 
+    // The hatch animation lives on row 8; the two frames right after it are the dazed/stun pose
+    constexpr int   SNOBEE_SPAWN_ROW = 8;
+    constexpr int   SNOBEE_STUN_COL = SNOBEE_BASE_COL + 6; // cols 14/15
+    constexpr float SNOBEE_STOMP_SCORE_TIME = 1.5f;        // how long the 100 lingers
+
     constexpr float SNOBEE_ICE_CRUSH_TIME = 1.0f; // long enough for the ice block's break animation
-    constexpr int   SNOBEE_CRUSH_ABILITY_MIN = 4; // seconds before a Sno-Bee learns to crush ice
-    constexpr int   SNOBEE_CRUSH_ABILITY_MAX = 9;
+
+    // How long a Sno-Bee stays calm (wandering) vs aggressive (chasing, can crush ice)
+    constexpr int   SNOBEE_CALM_MIN = 4;
+    constexpr int   SNOBEE_CALM_MAX = 7;
+    constexpr int   SNOBEE_AGGRO_MIN = 3;
+    constexpr int   SNOBEE_AGGRO_MAX = 5;
 }
 
 dae::SnoBeeCharacter::SnoBeeCharacter(ResourceManager &resourceManager, const SnoBeeType* type)
@@ -80,7 +90,7 @@ dae::SnoBeeCharacter::SnoBeeCharacter(ResourceManager &resourceManager, const Sn
 
     m_targetPosition = GetLocalPosition();
     m_thinkTimerFrames = m_maxThinkFrames;
-    m_crushAbilityTimer = static_cast<float>(GetRandomInt(SNOBEE_CRUSH_ABILITY_MIN, SNOBEE_CRUSH_ABILITY_MAX));
+    m_aggroTimer = static_cast<float>(GetRandomInt(SNOBEE_CALM_MIN, SNOBEE_CALM_MAX)); // start calm
 
     if (m_pType)
     {
@@ -90,6 +100,8 @@ dae::SnoBeeCharacter::SnoBeeCharacter(ResourceManager &resourceManager, const Sn
 
     AddComponent<BaseEnemyUpdateComponent>();
     AddComponent<GridObjectComponent>();
+    // Added after the sprite's RenderComponent so the score pops on top of the body
+    m_pScorePopup = AddComponent<ScorePopupComponent>(resourceManager);
 }
 
 dae::SnoBeeCharacter::~SnoBeeCharacter() = default;
@@ -133,14 +145,14 @@ void dae::SnoBeeCharacter::PerformAction(float dt)
         return;
     }
 
-    // Earn the ice-crushing ability after a short random delay
-    if (!m_canCrushIce)
+    // Drift between calm wandering and aggressive chasing; only aggressive ones crush ice
+    m_aggroTimer -= dt;
+    if (m_aggroTimer <= 0.0f)
     {
-        m_crushAbilityTimer -= dt;
-        if (m_crushAbilityTimer <= 0.0f)
-        {
-            m_canCrushIce = true;
-        }
+        m_isAggressive = !m_isAggressive;
+        m_aggroTimer = m_isAggressive
+            ? static_cast<float>(GetRandomInt(SNOBEE_AGGRO_MIN, SNOBEE_AGGRO_MAX))
+            : static_cast<float>(GetRandomInt(SNOBEE_CALM_MIN, SNOBEE_CALM_MAX));
     }
 
     // Alive and on the move: cycle the walking animation
@@ -169,7 +181,7 @@ void dae::SnoBeeCharacter::PerformAction(float dt)
         }
 
         // Blocked by ice we can crush: shatter it (with its break animation) and wait
-        if (m_canCrushIce && IsTileIce(m_currentDirection))
+        if (m_isAggressive && IsTileIce(m_currentDirection))
         {
             ChangeState(EnemyState::BreakingIce);
             BreakBlockInDirection(m_currentDirection); // kicks off the ice block's crush animation
@@ -209,7 +221,22 @@ void dae::SnoBeeCharacter::UpdateAnimation(float dt)
 {
     const int baseRow = 9 + (m_pType ? m_pType->spriteSheetRowOffset : 0);
 
-    int row = baseRow + SNOBEE_MOVE_ROW_OFFSET;
+    m_animTimer += dt;
+    if (m_animTimer >= SNOBEE_ANIM_FRAME_TIME)
+    {
+        m_animTimer -= SNOBEE_ANIM_FRAME_TIME;
+        m_animFrame = (m_animFrame + 1) % 2;
+    }
+
+    // Dazed: flicker the two stun frames that sit right after the hatch animation
+    if (m_currentState != EnemyState::Dead && m_stunTimer > 0.0f)
+    {
+        const int stunCol = SNOBEE_STUN_COL + m_animFrame;
+        SetSpriteSourceRect(stunCol * SNOBEE_SPRITE_SIZE, SNOBEE_SPAWN_ROW * SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE, SNOBEE_SPRITE_SIZE);
+        return;
+    }
+
+    int row = baseRow; // calm wandering walk (row 9)
     glm::vec2 dir = m_currentDirection;
     if (m_currentState == EnemyState::Dead)
     {
@@ -220,12 +247,9 @@ void dae::SnoBeeCharacter::UpdateAnimation(float dt)
     {
         row = baseRow + SNOBEE_ANGRY_ROW_OFFSET; // angry frames while crushing ice
     }
-
-    m_animTimer += dt;
-    if (m_animTimer >= SNOBEE_ANIM_FRAME_TIME)
+    else if (m_currentState == EnemyState::Chasing)
     {
-        m_animTimer -= SNOBEE_ANIM_FRAME_TIME;
-        m_animFrame = (m_animFrame + 1) % 2;
+        row = baseRow + SNOBEE_MOVE_ROW_OFFSET; // aggressive chase walk (row 10)
     }
 
     const int col = SNOBEE_BASE_COL + DirectionBaseFrame(dir) + m_animFrame;
@@ -243,6 +267,28 @@ void dae::SnoBeeCharacter::Stun(float duration)
 {
     m_stunTimer = duration;
     m_isMovingToTarget = false;
+}
+
+bool dae::SnoBeeCharacter::IsStunned() const
+{
+    return m_stunTimer > 0.0f
+        && health > 0
+        && m_currentState != EnemyState::Dead
+        && m_currentState != EnemyState::Hatching;
+}
+
+void dae::SnoBeeCharacter::KillByPlayer()
+{
+    if (health <= 0) return; // already going down
+
+    health = 0;
+    if (m_pScorePopup)
+    {
+        // 100 points: first row, first column of scores.png
+        m_pScorePopup->Show(Rect{ 0.0f, 0.0f, 16.0f, 16.0f }, SNOBEE_STOMP_SCORE_TIME);
+    }
+    ChangeState(EnemyState::Dead);       // squash sound, leaves the grid, restarts the anim
+    m_deathTimer = SNOBEE_STOMP_SCORE_TIME; // linger long enough to read the score
 }
 
 void dae::SnoBeeCharacter::ProcessMovement(float dt)
@@ -267,11 +313,8 @@ void dae::SnoBeeCharacter::ProcessMovement(float dt)
 
 void dae::SnoBeeCharacter::Think()
 {
-    // Determine whether to chase or wander
-    // Arcade style: simple line of sight or global tracking depending on AI Tier
-    bool canSeePlayer = true; // In arcade, enemies often always know player pos, just track differently
-
-    if (canSeePlayer)
+    // Aggressive Sno-Bees home in on Pengo (and can crush ice); calm ones just wander
+    if (m_isAggressive)
     {
         ChasePlayer();
     }
@@ -319,7 +362,7 @@ void dae::SnoBeeCharacter::ChasePlayer()
     }
 
     // Head straight through ice toward the player once we can crush it
-    if (m_canCrushIce && IsTileIce(primaryDir))
+    if (m_isAggressive && IsTileIce(primaryDir))
     {
         m_currentDirection = primaryDir;
         return;
@@ -331,7 +374,7 @@ void dae::SnoBeeCharacter::ChasePlayer()
         return;
     }
 
-    if (m_canCrushIce && IsTileIce(secondaryDir))
+    if (m_isAggressive && IsTileIce(secondaryDir))
     {
         m_currentDirection = secondaryDir;
         return;

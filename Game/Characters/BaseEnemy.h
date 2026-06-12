@@ -14,8 +14,13 @@ namespace dae
         // We will hide it or make a Component bridge.
         void UpdateFromComponent(float dt);
 
+        // Who this enemy hunts (Pengo); without it the AI just chases the origin
+        void SetTarget(const GameObject* pTarget) { m_pTarget = pTarget; }
+
     protected:
         virtual void PerformAction(float dt) = 0;
+
+        const GameObject* m_pTarget{ nullptr };
 
         // Helper methods for subclasses
         void MoveTowards(const glm::vec2& dir);

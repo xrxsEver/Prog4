@@ -348,6 +348,7 @@ namespace dae
             auto snoBee = std::make_unique<SnoBeeCharacter>(m_resourceManager, basicType);
             const glm::vec2 screenPos = GetScreenPos(b.r, b.c);
             snoBee->SetLocalPosition({ screenPos.x, screenPos.y, 0 });
+            snoBee->SetTarget(m_pPengo);
 
             m_scene.AddSnoBee(snoBee.get());
             m_scene.Add(std::move(snoBee));
@@ -388,6 +389,7 @@ namespace dae
                         auto snoBee = std::make_unique<SnoBeeCharacter>(m_resourceManager, basicType);
                         const glm::vec2 screenPos = GetScreenPos(b.r, b.c);
                         snoBee->SetLocalPosition({ screenPos.x, screenPos.y, 0 });
+                        snoBee->SetTarget(m_pPengo);
 
                         m_scene.AddSnoBee(snoBee.get());
                         m_scene.Add(std::move(snoBee));

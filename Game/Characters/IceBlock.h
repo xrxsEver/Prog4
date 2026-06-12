@@ -7,6 +7,7 @@ namespace dae
     class RenderComponent;
     class ResourceManager;
     class Texture2D;
+    class PengoCharacter;
 
     class IceBlock final : public GameObject
     {
@@ -45,8 +46,12 @@ namespace dae
         void SetDiamond(bool isDiamond) { m_isDiamond = isDiamond; }
         bool IsDiamond() const { return m_isDiamond; }
 
+        // Who to credit when this block squashes Sno-Bees (persists across Reset)
+        void SetPlayer(PengoCharacter* pPengo) { m_pPengo = pPengo; }
+
     private:
         bool m_isActive{ false };
+        PengoCharacter* m_pPengo{ nullptr };
         bool m_hasEgg{ false };
         bool m_isDiamond{ false };
         RenderComponent* m_pRenderComponent{ nullptr };

@@ -56,11 +56,24 @@ namespace dae
         void Update(float deltaTime) override;
         void Render() const override;
 
-        // Hook Pengo up so the maze can react when he dies
-        void SetPengo(PengoCharacter* pPengo) { m_pPengo = pPengo; }
+        // Hook Pengo up so the maze can react when he dies, and so blocks can credit kills
+        void SetPengo(PengoCharacter* pPengo) { m_pPengo = pPengo; if (m_pIceBlockPool) m_pIceBlockPool->SetPlayer(pPengo); }
 
         // How many Sno-Bees are still waiting in the reserve (drives the on-screen counter)
         int GetSnoBeeReserve() const { return m_snoBeeReserve; }
+
+        // Current level number, pulled from the level filename ("level1.json" -> 1)
+        int GetLevelNumber() const
+        {
+            int number = 0;
+            bool found = false;
+            for (char ch : m_levelFile)
+            {
+                if (ch >= '0' && ch <= '9') { number = number * 10 + (ch - '0'); found = true; }
+                else if (found) break;
+            }
+            return found ? number : 1;
+        }
 
         const char* GetDebugName() const override { return "Maze Drawing Component"; }
         std::unique_ptr<Component> Clone(GameObject* pOwner) const override;

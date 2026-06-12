@@ -12,6 +12,7 @@ namespace dae
     class ResourceManager;
     class RenderComponent;
     class PengoState;
+    class BorderComponent;
 
     // Enum to represent Pengo's facing direction
     enum class PengoDirection
@@ -48,6 +49,9 @@ namespace dae
 
         void BindKeyboardControls(InputManager& inputManager);
 
+        // Let Pengo rattle the field border when he pushes straight into a wall
+        void SetBorder(BorderComponent* pBorder) { m_pBorder = pBorder; }
+
         // Kick off the dying sequence (ignored if already dying). Pengo then holds the
         // dying animation until the level coordinator calls Respawn().
         void Die();
@@ -78,6 +82,7 @@ namespace dae
         glm::vec3 m_previousPosition{};
 
         RenderComponent* m_pRenderComponent;
+        BorderComponent* m_pBorder{nullptr};
         PengoDirection m_currentDirection{PengoDirection::Down};
         int m_animationFrame{-1};
 

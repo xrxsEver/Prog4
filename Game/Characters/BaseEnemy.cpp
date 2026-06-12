@@ -96,6 +96,7 @@ namespace dae
 
     glm::vec3 BaseEnemy::GetPlayerPosition() const
     {
-        return glm::vec3(0.0f, 0.0f, 0.0f);
+        // Chase the real target if we have one; otherwise fall back to the origin
+        return m_pTarget ? m_pTarget->GetWorldPosition() : glm::vec3(0.0f, 0.0f, 0.0f);
     }
 }

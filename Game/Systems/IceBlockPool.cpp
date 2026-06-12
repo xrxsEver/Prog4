@@ -18,6 +18,14 @@ namespace dae
         }
     }
 
+    void IceBlockPool::SetPlayer(PengoCharacter* pPengo)
+    {
+        for (const auto& block : m_pool)
+        {
+            block->SetPlayer(pPengo);
+        }
+    }
+
     [[nodiscard]] IceBlock* IceBlockPool::Acquire()
     {
         for (const auto& block : m_pool)

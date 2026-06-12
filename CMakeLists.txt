@@ -182,8 +182,12 @@ set(GAME_SOURCES
   Game/Components/RemainingLivesDisplayComponent.cpp
   Game/Components/ScoreDisplayComponent.cpp
   Game/Components/MazeDrawingComponent.cpp
+  Game/Components/BorderComponent.cpp
   Game/Components/LivesIconComponent.cpp
   Game/Components/SnoBeeCounterComponent.cpp
+  Game/Components/ScorePopupComponent.cpp
+  Game/Components/HighScoreDisplayComponent.cpp
+  Game/Components/LevelDisplayComponent.cpp
 )
 
 set(GAME_INCLUDE_DIRS
