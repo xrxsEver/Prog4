@@ -1,108 +1,70 @@
-﻿# Minigin
+# Pengo
 
-Minigin is a very small project using [SDL3](https://www.libsdl.org/) and [glm](https://github.com/g-truc/glm) for 2D c++ game projects. It is in no way a game engine, only a barebone start project where everything sdl related has been set up. It contains glm for vector math, to aleviate the need to write custom vector and matrix classes.
+A remake of the 1982 arcade game **Pengo**, built on a small engine I wrote myself on top of Minigin
+[Minigin](https://github.com/avadae/minigin) and
+[SDL3](https://www.libsdl.org/). It's a DAE *Programming 4* exam project: the point isn't just the
+game, it's building the engine with the patterns from Robert Nystrom's
+*[Game Programming Patterns](https://gameprogrammingpatterns.com/)*.
 
-[![Build Status](https://github.com/avadae/minigin/actions/workflows/cmake.yml/badge.svg)](https://github.com/avadae/cmake/actions)
-[![Build Status](https://github.com/avadae/minigin/actions/workflows/emscripten.yml/badge.svg)](https://github.com/avadae/emscripten/actions)
-[![GitHub Release](https://img.shields.io/github/v/release/avadae/minigin?logo=github&sort=semver)](https://github.com/avadae/minigin/releases/latest)
+Three levels loaded from data, three modes (single-player, co-op, versus), full controller support and
+a navigable menu.
 
-# Goal
+## Design
 
-Minigin can/may be used as a start project for the exam assignment in the course [Programming 4](https://youtu.be/j96Oh6vzhmg) at DAE. In that assignment students need to recreate a popular 80's arcade game with a game engine they need to program themselves. During the course we discuss several game programming patterns, using the book '[Game Programming Patterns](https://gameprogrammingpatterns.com/)' by [Robert Nystrom](https://github.com/munificent) as reading material. 
+The codebase is split hard down the middle:
 
-# Project Layout
+- **`Engine/`** — reusable framework. The game loop, object/component model, input, rendering, scenes,
+  audio, events. It knows nothing about Pengo.
+- **`Game/`** — everything Pengo-specific: the maze, ice blocks, Sno-Bees, the HUD, game modes.
 
-The codebase is split into two top-level source folders:
+Keeping game concepts out of the engine is what makes the engine an engine and not just "the game in two
+folders." Everything lives in the `dae` namespace.
 
-- `Engine/`: reusable framework and runtime code.
-    - `Core/`: base runtime object model and engine loop.
-    - `Input/`: gamepad and input dispatch.
-    - `Rendering/`: renderer, textures, fonts, text and resources.
-    - `Scene/`: scene and scene manager.
-    - `UI/`: debug/editor UI windows.
-    - `Events/`: observer/subject and event contracts.
-- `Game/`: game-specific behavior and content.
-    - `App/`: game entry point and scene bootstrap.
-    - `Systems/`: game-level systems (achievements, shared state abstractions).
-    - `Characters/`: player and enemy entities.
-    - `Commands/`: gameplay commands bound to input.
-    - `Components/`: gameplay/UI components attached to game objects.
+## Patterns
 
-This separation keeps engine concerns and game concerns isolated while still building into one executable through CMake.
+These are the design / game-programming patterns the engine is built on, and where to look for each:
 
-# Disclaimer
+- **Game Loop** — `Engine/Core/Minigin.cpp`. A fixed-timestep accumulator: deterministic `FixedUpdate()`
+  steps for logic/physics, then one variable-rate `Update()`, then render. Delta time is clamped so a
+  hitch can't blow up the simulation. The same loop drives both the desktop build and the web
+  (Emscripten) build.
+- **Update Method** — every `GameObject` and `Component` gets `Update(deltaTime)` each frame, so each
+  entity advances its own behaviour (animation, movement, timers) without the loop knowing the details.
+- **Command** — `Engine/Core/Command.h`. Input is bound to command objects, never handled inline. Game
+  commands live in `Game/Commands/` (Move, Push, AddScore, LoseLife) and are bound through the
+  `InputManager`. The same command works from keyboard or gamepad, which is what makes rebinding and
+  two-player input trivial.
+- **Observer** — `Engine/Events/` (`Subject` / `Observer` / `Event`). The score and lives HUD *observe*
+  the player instead of polling it: when the player scores or dies, it notifies, and the display reacts.
+- **Component** — `Engine/Core/GameObject`. Objects are composed of components rather than built from an
+  inheritance tree. A `GameObject` owns its components and a parent/child transform hierarchy; behaviour
+  is added by attaching components (render, text, the player character, the maze, HUD readouts).
+- **State** — `Game/Characters/PengoState.{h,cpp}`. Pengo is a small state machine — Idle / Moving /
+  Pushing / Dying — where each state handles input and returns the next state. The death flow lives
+  entirely in the Dying state instead of being scattered through `if` checks.
 
-Minigin is, despite perhaps the suggestion in its name, **not** a game engine. It is just a very simple SDL3 ready project with some of the scaffolding in place to get started. None of the patterns discussed in the course are used yet (except singleton which use we challenge during the course). It is up to the students to implement their own vision for their engine, apply patterns as they see fit, create their game as efficient as possible.
+A few more in use: **Service Locator** for the global sound system and collision grid
+(`Engine/Audio/ServiceLocator.h`), and **Singleton** for the handful of true engine-wide managers
+(`Renderer`, `SceneManager`, `ResourceManager`).
 
-# Use
+## Build & run
 
-Get the source from this project, or since students need to have their work on github too, they can use this repository as a template. Hit the "Use this template" button on the top right corner of the github page of this project.
+**Windows** — open the root folder in Visual Studio 2026 or VS Code (both recognise it as a CMake
+project), or configure from the command line:
 
-## Windows version
+```
+cmake -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --config Debug
+```
 
-Either
-- Open the root folder in Visual Studio 2026; this will be recognized as a cmake project.
-  
-Or
-- Install CMake 
-- Install CMake and CMake Tools extensions in Visual Code
-- Open the root folder in Visual Code,  this will be recognized as a cmake project.
+The executable looks for assets in `./Data/`; CMake copies `Data/` (and the SDL DLLs) next to the exe
+as a post-build step.
 
-Or
-- Use whatever editor you like :)
+**Web (Emscripten)** — with emsdk active:
 
-## Emscripten (web) version
-
-### On windows
-
-For installing all of the needed tools on Windows I recommend using [Chocolatey](https://chocolatey.org/). You can then run the following in a terminal to install what is needed:
-
-    choco install -y cmake
-    choco install -y emscripten
-    choco install -y ninja
-    choco install -y python
-
-In a terminal, navigate to the root folder. Run this: 
-
-    mkdir build_web
-    cd build_web
-    emcmake cmake ..
-    emmake ninja
-
-To be able to see the webpage you can start a python webserver in the build_web folder
-
-    python -m http.server
-
-Then browse to http://localhost:8000 and you're good to go.
-
-### On OSX
-
-On Mac you can use homebrew
-
-    brew install cmake
-    brew install emscripten
-    brew install python
-
-In a terminal on OSX, navigate to the root folder. Run this: 
-
-    mkdir build_web
-    cd build_web
-    emcmake cmake .. -DCMAKE_OSX_ARCHITECTURES=""
-    emmake make
-
-To be able to see the webpage you can start a python webserver in the build_web folder
-
-    python3 -m http.server
-
-Then browse to http://localhost:8000 and you're good to go.
-
-## Github Actions
-
-This project is build with github actions.
-- The CMake workflow builds the project in Debug and Release for Windows and serves as a check that the project builds on that platform.
-- The Emscripten workflow generates a web version of the project and publishes it as a [github page](https://avadae.github.io/minigin/). 
-  - The url of that page will be `https://<username>.github.io/<repository>/`
-- You can embed this page with 
-
-```<iframe style="position: absolute; top: 0px; left: 0px; width: 1024px; height: 576px;" src="https://<username>.github.io/<repository>/" loading="lazy"></iframe>```
-
+```
+mkdir build_web && cd build_web
+emcmake cmake ..
+emmake ninja
+python -m http.server   # then open http://localhost:8000
+```
