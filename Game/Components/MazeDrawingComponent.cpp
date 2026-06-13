@@ -30,6 +30,19 @@ namespace
     // If audio is disabled/failed, Start.mp3 never reports "playing"; start the loop anyway after this.
     constexpr float kStartGraceSeconds = 1.5f;
 
+    // Fast-clear time bonus: wiping every Sno-Bee under 60s pays out on a sliding, Pengo-style scale
+    // (the quicker the clear, the bigger the reward). At/over 60s there is no bonus.
+    constexpr float kTimeBonusWindow = 60.0f;
+    int TimeBonusFor(float seconds)
+    {
+        if (seconds >= kTimeBonusWindow) return 0;
+        if (seconds < 15.0f) return 5000;
+        if (seconds < 20.0f) return 2000;
+        if (seconds < 30.0f) return 1000;
+        if (seconds < 40.0f) return 500;
+        return 100; // 40s up to (but not including) 60s
+    }
+
     // The Sno-Bee sprite block (row, col) into pengo.png, keyed by level number and shared across
     // all game modes. Kept in code (not JSON) so there's a single obvious place to retune it.
     // pengo.png is 40x18 cells of 16px, so these stay on-sheet. Tweak the values here per level.
@@ -62,8 +75,9 @@ namespace dae
 
         m_pIceBlockPool = std::make_unique<IceBlockPool>(scene, resourceManager);
 
+        // levelFile is the base name (e.g. "single1"); Load picks JSON (debug) or the cooked .bin (release).
         MazeGenerator generator;
-        const auto result = generator.LoadFromFile(m_resourceManager.GetDataPath() + levelFile);
+        const auto result = generator.Load(m_resourceManager.GetDataPath(), levelFile);
 
         m_rows = result.rows;
         m_cols = result.cols;
@@ -237,6 +251,9 @@ namespace dae
             return;
         }
 
+        // Count only genuine play time (this phase): the intro draw and the death wipe/hold don't add.
+        m_levelTime += deltaTime;
+
         UpdateRedFlash(deltaTime);
 
         // Lining the three diamonds up grants a one-off bonus and stuns every Sno-Bee
@@ -300,8 +317,19 @@ namespace dae
         if (!m_levelComplete && m_snoBeeReserve == 0 && m_spawnStep == SpawnStep::None && !AnySnoBeeAlive())
         {
             m_levelComplete = true;
+            AwardTimeBonus(); // pay the fast-clear bonus before the controller advances the level
             if (m_onLevelComplete) m_onLevelComplete();
         }
+    }
+
+    void MazeDrawingComponent::AwardTimeBonus()
+    {
+        if (m_timeBonusAwarded) return;
+        m_timeBonusAwarded = true;
+
+        const int bonus = TimeBonusFor(m_levelTime);
+        // Co-op keeps the team score whole on player one (the HUD sums both), so credit p1.
+        if (bonus > 0 && m_pPengo) m_pPengo->AddScore(bonus);
     }
 
     void MazeDrawingComponent::UpdateMusic(float deltaTime)

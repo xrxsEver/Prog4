@@ -92,6 +92,9 @@ namespace dae
         // Current level number, read from the level JSON's "level" field
         int GetLevelNumber() const { return m_levelNumber; }
 
+        // Seconds of active play so far this level (the HUD timer; pauses during intro/death).
+        float GetLevelTime() const { return m_levelTime; }
+
         const char* GetDebugName() const override { return "Maze Drawing Component"; }
         std::unique_ptr<Component> Clone(GameObject* pOwner) const override;
 
@@ -105,6 +108,9 @@ namespace dae
 
         // Drives the Start.mp3 -> MainBGM.mp3 hand-off; called every frame regardless of LevelPhase.
         void UpdateMusic(float deltaTime);
+
+        // Award the fast-clear time bonus (if any) to player one when the level is cleared.
+        void AwardTimeBonus();
 
         // Life-lost sequence
         void StartDeathSequence();
@@ -175,6 +181,10 @@ namespace dae
         float m_holdTimer = 0.0f;
         int m_rememberedSnoBeeCount = 0;
         std::vector<glm::vec3> m_blockSnapshot{};    // remembered ice-block positions
+
+        // HUD timer: seconds of active play this level; gates and sizes the fast-clear bonus.
+        float m_levelTime = 0.0f;
+        bool m_timeBonusAwarded = false; // one-shot guard so the bonus is granted exactly once
 
         // Per-level tuning, all read from the level JSON in the constructor
         int m_levelNumber = 1;

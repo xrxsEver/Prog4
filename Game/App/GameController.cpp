@@ -31,6 +31,7 @@
 #include "ScoreDisplayComponent.h"
 #include "HighScoreDisplayComponent.h"
 #include "LevelDisplayComponent.h"
+#include "TimeDisplayComponent.h"
 
 #include "StartMenuComponent.h"
 #include "VersusControllerComponent.h"
@@ -207,10 +208,10 @@ namespace dae
 
     const char* GameController::LevelFile(GameMode mode, int level)
     {
-        // Each mode owns three level files; clamp so a stray index can't read out of bounds.
-        static const char* kSingle[kLevelsPerMode]  = { "single1.json", "single2.json", "single3.json" };
-        static const char* kCoop[kLevelsPerMode]    = { "coop1.json",   "coop2.json",   "coop3.json"   };
-        static const char* kVersus[kLevelsPerMode]  = { "versus1.json", "versus2.json", "versus3.json" };
+        // Base name only (no extension); MazeGenerator::Load picks .json (debug) or .bin (release).
+        static const char* kSingle[kLevelsPerMode]  = { "single1", "single2", "single3" };
+        static const char* kCoop[kLevelsPerMode]    = { "coop1",   "coop2",   "coop3"   };
+        static const char* kVersus[kLevelsPerMode]  = { "versus1", "versus2", "versus3" };
 
         const int i = std::min(std::max(level, 1), kLevelsPerMode) - 1;
         switch (mode)
@@ -402,6 +403,12 @@ namespace dae
         levelGo->AddComponent<LevelDisplayComponent>(mazeComp, "LEVEL");
         levelGo->SetPosition(500, 106);
         scene.Add(std::move(levelGo));
+
+        auto timeGo = std::make_unique<GameObject>("Time");
+        timeGo->AddComponent<TextComponent>("TIME 0:00", hudFont, TextComponent::Color{ 255, 255, 255, 255 });
+        timeGo->AddComponent<TimeDisplayComponent>(mazeComp, "TIME");
+        timeGo->SetPosition(500, 134);
+        scene.Add(std::move(timeGo));
 
         // Players (Subjects) are added LAST. Scenes destroy objects front-to-back, and a Subject
         // does not notify its observers when it dies, so the score/lives observers added above

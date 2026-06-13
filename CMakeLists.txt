@@ -185,6 +185,7 @@ set(GAME_SOURCES
   Game/Components/ScorePopupComponent.cpp
   Game/Components/HighScoreDisplayComponent.cpp
   Game/Components/LevelDisplayComponent.cpp
+  Game/Components/TimeDisplayComponent.cpp
   Game/Components/StartMenuComponent.cpp
   Game/Components/VersusControllerComponent.cpp
   Game/Components/NameEntryComponent.cpp
@@ -222,6 +223,29 @@ if(MSVC)
   target_compile_options(${TARGET_NAME} PRIVATE /W4 /WX)
 else()
   target_compile_options(${TARGET_NAME} PRIVATE -Wall -Wextra -Werror)
+endif()
+
+# Level cooker: a tiny host tool that bakes the level JSON into the binary form the release build
+# loads. It reuses MazeGenerator (which is self-contained: just nlohmann_json). Not built for the web
+# build, where Data is preloaded into the virtual FS at link time and the JSON path is used directly.
+if(NOT EMSCRIPTEN)
+  add_executable(level_cooker
+    Game/Tools/LevelCooker.cpp
+    Game/Systems/MazeGenerator.cpp
+  )
+  target_compile_features(level_cooker PRIVATE cxx_std_20)
+  target_include_directories(level_cooker PRIVATE ${CMAKE_SOURCE_DIR}/Game/Systems)
+  target_link_libraries(level_cooker PRIVATE nlohmann_json::nlohmann_json)
+  if(MSVC)
+    target_compile_options(level_cooker PRIVATE /W4 /WX)
+  else()
+    target_compile_options(level_cooker PRIVATE -Wall -Wextra -Werror)
+    # Statically link the runtime so this build-time tool has no DLL dependency and runs as a
+    # POST_BUILD step regardless of whether MinGW's runtime DLLs are on PATH.
+    target_link_options(level_cooker PRIVATE -static -static-libgcc -static-libstdc++)
+  endif()
+  # Make sure the cooker exists before the game's post-build cook step runs.
+  add_dependencies(${TARGET_NAME} level_cooker)
 endif()
 
 if(EMSCRIPTEN)
@@ -294,5 +318,16 @@ else()
   # Copy Data folder to output directory after build
   add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/Data" "$<TARGET_FILE_DIR:${TARGET_NAME}>/Data"
+  )
+endif()
+
+# After Data is staged next to the exe, cook the level JSON into binary (.bin) right beside it. This
+# runs after the copy commands above (POST_BUILD steps fire in registration order), so the binaries
+# land in the output Data folder. Debug loads the JSON; release loads these .bin files.
+if(NOT EMSCRIPTEN)
+  add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+    COMMAND "$<TARGET_FILE:level_cooker>" "$<TARGET_FILE_DIR:${TARGET_NAME}>/Data"
+    COMMENT "Cooking level JSON -> binary"
+    VERBATIM
   )
 endif()

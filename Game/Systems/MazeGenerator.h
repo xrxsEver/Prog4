@@ -33,7 +33,18 @@ namespace dae
             float snoBeeSpeed{200.0f};     // pixels/second the Sno-Bees move
         };
 
+        // Parse a level from its JSON layout (the human-readable, source-of-truth format).
         GenerationResult LoadFromFile(const std::string& filepath);
+
+        // Load a level by base name (e.g. "single1") from a data folder, choosing the format by build:
+        // release reads the cooked binary (".bin", falling back to JSON if absent); debug reads JSON,
+        // which stays authoritative while you hand-edit levels. dataPath must end in a separator.
+        GenerationResult Load(const std::string& dataPath, const std::string& baseName);
+
+        // Binary "cooked" form: a flat dump of a parsed GenerationResult, so loading it is pure
+        // deserialization with no text parsing. Produced by the level cooker tool at build time.
+        static void WriteBinary(const GenerationResult& result, const std::string& filepath);
+        static GenerationResult ReadBinary(const std::string& filepath);
 
     private:
     };
