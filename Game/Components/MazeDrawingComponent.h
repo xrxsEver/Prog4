@@ -45,6 +45,16 @@ namespace dae
         DeathHold
     };
 
+    // Music hand-off across a level: the maze-draw track loops, then Start.mp3 plays once, and the
+    // looping level theme kicks in the moment that jingle ends (see UpdateMusic).
+    enum class BgmPhase
+    {
+        Drawing,        // DrawingMaze.mp3 loops while the maze is carved
+        WaitStartBegin, // Start.mp3 queued; waiting for it to actually start sounding
+        WaitStartEnd,   // Start.mp3 is playing; waiting for it to finish
+        Looping         // MainBGM.mp3 looping for the rest of the level
+    };
+
     class MazeDrawingComponent final : public Component
     {
     public:
@@ -65,6 +75,9 @@ namespace dae
 
         // Fired once when the level is cleared (whole reserve spent, no Sno-Bee left alive).
         void SetOnLevelComplete(std::function<void()> cb) { m_onLevelComplete = std::move(cb); }
+
+        // Fired once when the last life is lost (no player has a life left to respawn on).
+        void SetOnGameOver(std::function<void()> cb) { m_onGameOver = std::move(cb); }
 
         // Versus: stop the maze hatching its own Sno-Bees (player two brings the only one).
         void SetEnemiesEnabled(bool enabled) { m_enemiesEnabled = enabled; if (!enabled) m_snoBeeReserve = 0; }
@@ -89,6 +102,9 @@ namespace dae
         void UpdatePlaying(float deltaTime);
         void UpdateDeathWipe(float deltaTime);
         void UpdateDeathHold(float deltaTime);
+
+        // Drives the Start.mp3 -> MainBGM.mp3 hand-off; called every frame regardless of LevelPhase.
+        void UpdateMusic(float deltaTime);
 
         // Life-lost sequence
         void StartDeathSequence();
@@ -120,6 +136,8 @@ namespace dae
         std::function<void(glm::vec2)> m_onFinished{};
         std::function<void()> m_onLevelComplete{};
         bool m_levelComplete = false;        // fired the one-shot clear callback already?
+        std::function<void()> m_onGameOver{};
+        bool m_gameOverFired = false;        // last life lost -> ran the one-shot game-over callback?
         std::string m_levelFile;
         glm::vec2 m_pengoSpawnPos{0, 0};
 
@@ -148,6 +166,11 @@ namespace dae
         bool m_hasSecondSpawn = false;
         bool m_enemiesEnabled = true;                    // versus turns the AI Sno-Bee spawns off
         LevelPhase m_phase = LevelPhase::Intro;
+
+        // Level music hand-off (see UpdateMusic / the BgmPhase enum)
+        BgmPhase m_bgmPhase = BgmPhase::Drawing;
+        float m_bgmGraceTimer = 0.0f;                // fallback so silent/disabled audio never hangs the hand-off
+
         float m_wipeProgress = 0.0f;                 // how far the black slide has fallen (pixels)
         float m_holdTimer = 0.0f;
         int m_rememberedSnoBeeCount = 0;

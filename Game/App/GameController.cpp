@@ -1,6 +1,7 @@
 #include "GameController.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -33,18 +34,23 @@
 
 #include "StartMenuComponent.h"
 #include "VersusControllerComponent.h"
+#include "NameEntryComponent.h"
 #include "MenuCommands.h"
 #include "CallbackCommand.h"
+
+#include "Character.h"
+#include "HighScores.h"
 
 namespace dae
 {
     GameController::GameController(SceneManager& sceneManager, ResourceManager& resourceManager,
-                                  InputManager& inputManager, Scene& menuScene, Scene& gameScene)
+                                  InputManager& inputManager, Scene& menuScene, Scene& gameScene, Scene& scoreScene)
         : m_sceneManager(sceneManager)
         , m_resourceManager(resourceManager)
         , m_inputManager(inputManager)
         , m_menuScene(menuScene)
         , m_gameScene(gameScene)
+        , m_scoreScene(scoreScene)
     {
     }
 
@@ -64,6 +70,19 @@ namespace dae
         m_pending = Pending::ShowMenu;
     }
 
+    void GameController::RequestEndRun(bool completed)
+    {
+        m_pending = Pending::EndRun;
+        m_pendingCompleted = completed;
+    }
+
+    void GameController::RequestShowBoard(const std::string& name, int score)
+    {
+        m_pending = Pending::ShowBoard;
+        m_boardHighlightName = name;
+        m_boardScore = score;
+    }
+
     void GameController::Tick()
     {
         // Clear the request before acting so a transition can safely queue another one.
@@ -72,11 +91,13 @@ namespace dae
 
         switch (pending)
         {
-            // EnterMode/NextLevel tear the game scene down and rebuild it. When the pump that runs
-            // this lives in the very scene being rebuilt (a level skip / clear), doing it now would
-            // clear the object list mid-iteration — so defer to the end of the active scene's update.
+            // EnterMode/NextLevel/EndRun tear the current scene down and rebuild. When the pump that
+            // runs this lives in the very scene being rebuilt (a level skip / clear / death), doing it
+            // now would clear the object list mid-iteration — so defer to the end of the active update.
         case Pending::EnterMode:  { const GameMode mode = m_pendingMode; ScheduleRebuild([this, mode] { EnterMode(mode); }); break; }
         case Pending::NextLevel:  ScheduleRebuild([this] { NextLevel(); }); break;
+        case Pending::EndRun:     { const bool c = m_pendingCompleted; ScheduleRebuild([this, c] { EndRun(c); }); break; }
+        case Pending::ShowBoard:  { const std::string n = m_boardHighlightName; const int s = m_boardScore; ScheduleRebuild([this, n, s] { BuildScoreBoardScene(n, s); }); break; }
         case Pending::ShowMenu:   ShowMenu(); break; // just swaps the active scene; safe immediately
         case Pending::None:       break;
         }
@@ -110,10 +131,27 @@ namespace dae
         m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::DPadUp, KeyState::Down, std::make_unique<MenuNavigateCommand>(*m_pMenu, -1));
         m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::DPadDown, KeyState::Down, std::make_unique<MenuNavigateCommand>(*m_pMenu, 1));
         m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::A, KeyState::Down, std::make_unique<MenuConfirmCommand>(*m_pMenu));
+
+        BindMuteToggle();
+    }
+
+    void GameController::BindMuteToggle()
+    {
+        // F2 flips master mute. The mute state lives in the sound system (a global service), so it
+        // persists across scene rebuilds — re-binding here just re-attaches the key each scene.
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_F2, KeyState::Down,
+            std::make_unique<CallbackCommand>([]
+            {
+                auto& sound = ServiceLocator::get_sound_system();
+                sound.set_muted(!sound.is_muted());
+            }));
     }
 
     void GameController::ShowMenu()
     {
+        // No level music on the menu.
+        ServiceLocator::get_sound_system().stop_music();
+
         m_inputManager.ClearBindings();
         BindMenuInput();
         if (m_pMenu != nullptr)
@@ -125,17 +163,26 @@ namespace dae
 
     void GameController::EnterMode(GameMode mode)
     {
-        // A fresh mode always starts at its first level.
+        // A fresh run: zero the score and fill the life pool, then start at the first level.
+        m_runScore = 0;
+        m_runLives = kStartLives;
         LoadLevel(mode, 1);
     }
 
     void GameController::NextLevel()
     {
-        // F1 skip: step to the next level, or drop back to the menu once the mode is finished.
+        // Carry this level's score and remaining lives into the run before rebuilding (the players
+        // are recreated per level, so the totals live on the controller between them).
+        m_runScore = CaptureScore();
+        m_runLives = CaptureLives();
+
+        // Step to the next level, or — once the last level is cleared — end the run as "completed"
+        // so the player gets to enter their name. (We're already inside the deferred rebuild here,
+        // so calling EndRun directly is safe: the game scene's objects haven't been torn down yet.)
         const int next = m_currentLevel + 1;
         if (next > kLevelsPerMode)
         {
-            ShowMenu();
+            EndRun(true);
             return;
         }
         LoadLevel(m_currentMode, next);
@@ -186,6 +233,8 @@ namespace dae
         // F1 skips to the next level (and back to the menu after the last one).
         m_inputManager.BindKeyboardCommand(SDL_SCANCODE_F1, KeyState::Down,
             std::make_unique<CallbackCommand>([this] { RequestNextLevel(); }));
+
+        BindMuteToggle();
     }
 
     void GameController::BuildGameScene(GameMode mode, int level)
@@ -261,6 +310,9 @@ namespace dae
         // Clearing the board (every Sno-Bee dead) advances to the next level, just like F1.
         mazeComp->SetOnLevelComplete([this] { RequestNextLevel(); });
 
+        // Losing the last life ends the run and sends the player to name entry.
+        mazeComp->SetOnGameOver([this] { RequestEndRun(false); });
+
         // Field border that rattles when a Pengo pushes into a wall (and stuns Sno-Bees along it).
         auto* borderComp = mazeIntro->AddComponent<BorderComponent>(scene, m_resourceManager);
         p1->SetBorder(borderComp);
@@ -320,6 +372,18 @@ namespace dae
         {
             scoreChars.push_back(p2);
         }
+        // Remember them so the end-of-run flow can read the final score before this scene is cleared.
+        m_scoreChars = scoreChars;
+
+        // Seed this level's players from the run totals so score accumulates and lives carry over.
+        // Co-op shares the score (kept whole on player one; the display sums both) and the life pool.
+        p1->score = m_runScore;
+        p1->health = m_runLives;
+        if (p2 != nullptr)
+        {
+            p2->score = 0;
+            p2->health = m_runLives;
+        }
 
         auto hiScore = std::make_unique<GameObject>("HighScore");
         hiScore->AddComponent<TextComponent>("HI-SCORE: 0", hudFont, TextComponent::Color{ 255, 209, 0, 255 });
@@ -354,5 +418,230 @@ namespace dae
         auto pump = std::make_unique<GameObject>("Flow Pump");
         pump->AddComponent<CallbackComponent>([this] { Tick(); });
         scene.Add(std::move(pump));
+    }
+
+    int GameController::CaptureScore() const
+    {
+        int total = 0;
+        for (const Character* c : m_scoreChars)
+        {
+            if (c) total += c->score;
+        }
+        return total;
+    }
+
+    int GameController::CaptureLives() const
+    {
+        // Player one carries the shared life pool (co-op's two Pengos lose a life together).
+        if (!m_scoreChars.empty() && m_scoreChars.front())
+        {
+            return m_scoreChars.front()->health;
+        }
+        return m_runLives;
+    }
+
+    void GameController::EndRun(bool completed)
+    {
+        // Read the final score off the live players BEFORE the game scene is cleared.
+        const int score = CaptureScore();
+
+        // The level is over: silence the looping theme before the score/name-entry screens.
+        ServiceLocator::get_sound_system().stop_music();
+
+        m_inputManager.ClearBindings();
+        m_gameScene.RemoveAll();
+        ServiceLocator::register_collision_grid(nullptr);
+        m_scoreChars.clear();
+
+        // Only prompt for initials when the score actually earns a spot; otherwise show the board.
+        if (HighScores::Qualifies(score))
+        {
+            BuildNameEntryScene(score, completed);
+        }
+        else
+        {
+            BuildScoreBoardScene("", score);
+        }
+    }
+
+    void GameController::BuildNameEntryScene(int score, bool completed)
+    {
+        Scene& scene = m_scoreScene;
+        scene.RemoveAll();
+
+        auto titleFont = m_resourceManager.LoadFont("PressStart2P-Regular.ttf", 20);
+        auto bodyFont  = m_resourceManager.LoadFont("PressStart2P-Regular.ttf", 16);
+        auto slotFont  = m_resourceManager.LoadFont("PressStart2P-Regular.ttf", 28);
+        auto hintFont  = m_resourceManager.LoadFont("PressStart2P-Regular.ttf", 10);
+
+        constexpr TextComponent::Color kWhite{ 255, 255, 255, 255 };
+        constexpr TextComponent::Color kYellow{ 255, 209, 0, 255 };
+        constexpr TextComponent::Color kGrey{ 160, 160, 160, 255 };
+
+        auto title = std::make_unique<GameObject>("Title");
+        title->AddComponent<TextComponent>(completed ? "CONGRATULATIONS!" : "GAME OVER",
+            titleFont, completed ? kYellow : kWhite);
+        title->SetPosition(completed ? 352.f : 420.f, 110.f);
+        scene.Add(std::move(title));
+
+        auto scoreLine = std::make_unique<GameObject>("Score Line");
+        scoreLine->AddComponent<TextComponent>("YOUR SCORE  " + std::to_string(score), bodyFont, kWhite);
+        scoreLine->SetPosition(360.f, 180.f);
+        scene.Add(std::move(scoreLine));
+
+        auto prompt = std::make_unique<GameObject>("Prompt");
+        prompt->AddComponent<TextComponent>("ENTER YOUR NAME", bodyFont, kYellow);
+        prompt->SetPosition(392.f, 240.f);
+        scene.Add(std::move(prompt));
+
+        // Three letter slots, spaced out and centred; the editor component drives their text/colour.
+        std::array<TextComponent*, HighScores::kNameLength> slots{};
+        constexpr float kSlotX0 = 454.f;
+        constexpr float kSlotDX = 44.f;
+        for (int i = 0; i < HighScores::kNameLength; ++i)
+        {
+            auto slot = std::make_unique<GameObject>("Name Slot");
+            slots[i] = slot->AddComponent<TextComponent>("A", slotFont, kWhite);
+            slot->SetPosition(kSlotX0 + static_cast<float>(i) * kSlotDX, 290.f);
+            scene.Add(std::move(slot));
+        }
+
+        // Submit commits the row and saves the file, then drops to the board with it highlighted.
+        auto onSubmit = [this, score](const std::string& name)
+        {
+            HighScores::Insert(name, score);
+            RequestShowBoard(name, score);
+        };
+
+        auto entryObj = std::make_unique<GameObject>("Name Entry");
+        auto* entry = entryObj->AddComponent<NameEntryComponent>(slots, onSubmit);
+        scene.Add(std::move(entryObj));
+
+        auto hint = std::make_unique<GameObject>("Hint");
+        hint->AddComponent<TextComponent>("UP/DOWN: LETTER    LEFT/RIGHT: SLOT    SPACE/A: OK",
+            hintFont, kGrey);
+        hint->SetPosition(230.f, 430.f);
+        scene.Add(std::move(hint));
+
+        BindNameEntryInput(entry);
+
+        auto pump = std::make_unique<GameObject>("Flow Pump");
+        pump->AddComponent<CallbackComponent>([this] { Tick(); });
+        scene.Add(std::move(pump));
+
+        m_sceneManager.SetActiveScene(&m_scoreScene);
+    }
+
+    void GameController::BuildScoreBoardScene(const std::string& highlightName, int score)
+    {
+        Scene& scene = m_scoreScene;
+        scene.RemoveAll();
+
+        auto titleFont = m_resourceManager.LoadFont("PressStart2P-Regular.ttf", 20);
+        auto rowFont   = m_resourceManager.LoadFont("PressStart2P-Regular.ttf", 16);
+        auto hintFont  = m_resourceManager.LoadFont("PressStart2P-Regular.ttf", 10);
+
+        constexpr TextComponent::Color kWhite{ 255, 255, 255, 255 };
+        constexpr TextComponent::Color kYellow{ 255, 209, 0, 255 };
+        constexpr TextComponent::Color kGrey{ 160, 160, 160, 255 };
+
+        auto title = std::make_unique<GameObject>("Title");
+        title->AddComponent<TextComponent>("HIGH SCORES", titleFont, kYellow);
+        title->SetPosition(402.f, 60.f);
+        scene.Add(std::move(title));
+
+        auto scoreLine = std::make_unique<GameObject>("Score Line");
+        scoreLine->AddComponent<TextComponent>("YOUR SCORE  " + std::to_string(score), rowFont, kWhite);
+        scoreLine->SetPosition(360.f, 110.f);
+        scene.Add(std::move(scoreLine));
+
+        const auto entries = HighScores::Load();
+        if (entries.empty())
+        {
+            auto empty = std::make_unique<GameObject>("Empty");
+            empty->AddComponent<TextComponent>("NO SCORES YET", rowFont, kGrey);
+            empty->SetPosition(380.f, 200.f);
+            scene.Add(std::move(empty));
+        }
+        else
+        {
+            bool highlighted = false;
+            float y = 170.f;
+            for (std::size_t i = 0; i < entries.size(); ++i)
+            {
+                const auto& e = entries[i];
+                const std::string row = std::to_string(i + 1) + ".  " + e.name + "   " + std::to_string(e.score);
+
+                // Light up the row we just committed (first exact match only).
+                const bool mine = !highlighted && !highlightName.empty()
+                    && e.name == highlightName && e.score == score;
+                if (mine) highlighted = true;
+
+                auto rowObj = std::make_unique<GameObject>("Row");
+                rowObj->AddComponent<TextComponent>(row, rowFont, mine ? kYellow : kWhite);
+                rowObj->SetPosition(360.f, y);
+                scene.Add(std::move(rowObj));
+                y += 30.f;
+            }
+        }
+
+        auto hint = std::make_unique<GameObject>("Hint");
+        hint->AddComponent<TextComponent>("PRESS SPACE / A TO CONTINUE", hintFont, kGrey);
+        hint->SetPosition(330.f, 520.f);
+        scene.Add(std::move(hint));
+
+        BindBoardInput();
+
+        auto pump = std::make_unique<GameObject>("Flow Pump");
+        pump->AddComponent<CallbackComponent>([this] { Tick(); });
+        scene.Add(std::move(pump));
+
+        m_sceneManager.SetActiveScene(&m_scoreScene);
+    }
+
+    void GameController::BindNameEntryInput(NameEntryComponent* entry)
+    {
+        m_inputManager.ClearBindings();
+
+        // Up/Down scroll the current letter; Left/Right move between the three slots. Both the
+        // arrow keys and WASD work, plus the D-pad, so any controller or keyboard can enter a name.
+        const auto changeUp   = [entry] { entry->ChangeLetter(1); };
+        const auto changeDown = [entry] { entry->ChangeLetter(-1); };
+        const auto moveLeft   = [entry] { entry->MoveCursor(-1); };
+        const auto moveRight  = [entry] { entry->MoveCursor(1); };
+        const auto confirm    = [entry] { entry->Confirm(); };
+
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_UP, KeyState::Down, std::make_unique<CallbackCommand>(changeUp));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_W, KeyState::Down, std::make_unique<CallbackCommand>(changeUp));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_DOWN, KeyState::Down, std::make_unique<CallbackCommand>(changeDown));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_S, KeyState::Down, std::make_unique<CallbackCommand>(changeDown));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_LEFT, KeyState::Down, std::make_unique<CallbackCommand>(moveLeft));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_A, KeyState::Down, std::make_unique<CallbackCommand>(moveLeft));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_RIGHT, KeyState::Down, std::make_unique<CallbackCommand>(moveRight));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_D, KeyState::Down, std::make_unique<CallbackCommand>(moveRight));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_SPACE, KeyState::Down, std::make_unique<CallbackCommand>(confirm));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_RETURN, KeyState::Down, std::make_unique<CallbackCommand>(confirm));
+
+        m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::DPadUp, KeyState::Down, std::make_unique<CallbackCommand>(changeUp));
+        m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::DPadDown, KeyState::Down, std::make_unique<CallbackCommand>(changeDown));
+        m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::DPadLeft, KeyState::Down, std::make_unique<CallbackCommand>(moveLeft));
+        m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::DPadRight, KeyState::Down, std::make_unique<CallbackCommand>(moveRight));
+        m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::A, KeyState::Down, std::make_unique<CallbackCommand>(confirm));
+
+        BindMuteToggle();
+    }
+
+    void GameController::BindBoardInput()
+    {
+        m_inputManager.ClearBindings();
+
+        const auto toMenu = [this] { RequestMenu(); };
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_SPACE, KeyState::Down, std::make_unique<CallbackCommand>(toMenu));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_RETURN, KeyState::Down, std::make_unique<CallbackCommand>(toMenu));
+        m_inputManager.BindKeyboardCommand(SDL_SCANCODE_ESCAPE, KeyState::Down, std::make_unique<CallbackCommand>(toMenu));
+        m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::A, KeyState::Down, std::make_unique<CallbackCommand>(toMenu));
+        m_inputManager.BindGamepadCommand(InputManager::AnyGamepad, Gamepad::Button::Start, KeyState::Down, std::make_unique<CallbackCommand>(toMenu));
+
+        BindMuteToggle();
     }
 }

@@ -1,37 +1,18 @@
 #include "HighScoreDisplayComponent.h"
-#include <fstream>
 #include <string>
 
 #include "Character.h"
 #include "GameObject.h"
 #include "TextComponent.h"
-
-namespace
-{
-    // Kept next to the executable (not in Data/, which the build recopies each time)
-    constexpr const char* HIGHSCORE_FILE = "highscore.txt";
-
-    int LoadHighScore()
-    {
-        std::ifstream file(HIGHSCORE_FILE);
-        int value = 0;
-        if (file >> value) return value;
-        return 0;
-    }
-
-    void SaveHighScore(int value)
-    {
-        std::ofstream file(HIGHSCORE_FILE, std::ios::trunc);
-        if (file) file << value;
-    }
-}
+#include "HighScores.h"
 
 namespace dae
 {
     HighScoreDisplayComponent::HighScoreDisplayComponent(GameObject* pOwner, Character* pCharacter, std::string labelPrefix)
         : Component(pOwner), m_pCharacter(pCharacter), m_labelPrefix(std::move(labelPrefix))
     {
-        m_highScore = LoadHighScore();
+        // Seed from the saved table's best row; the file itself is only written on name entry.
+        m_highScore = HighScores::TopScore();
     }
 
     void HighScoreDisplayComponent::Update(float /*deltaTime*/)
@@ -42,10 +23,11 @@ namespace dae
         }
         if (m_pCharacter == nullptr || m_pTextComponent == nullptr) return;
 
+        // Climb live as the player beats the record, but don't persist -- the table is saved only
+        // when a finished run commits its name (see GameController / HighScores::Insert).
         if (m_pCharacter->score > m_highScore)
         {
             m_highScore = m_pCharacter->score;
-            SaveHighScore(m_highScore);
         }
 
         if (m_highScore != m_cachedDisplay)

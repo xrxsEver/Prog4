@@ -18,8 +18,10 @@
 #include "StartMenuComponent.h"
 #include "CallbackComponent.h"
 
+#ifdef DAE_DEBUG_UI
 #include "GameDebugUI.h"
 #include "ImGuiManager.h"
+#endif
 
 #include <array>
 #include <memory>
@@ -34,14 +36,16 @@ namespace fs = std::filesystem;
 
 static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resourceManager, dae::InputManager &inputManager)
 {
-	// Two scenes: the start menu (active first) and an initially-empty scene the chosen mode
-	// is built into. The GameController switches between them.
+	// Three scenes: the start menu (active first), an initially-empty scene the chosen mode is
+	// built into, and a score scene for the end-of-run name entry / high-score board. The
+	// GameController switches between them.
 	auto &menuScene = sceneManager.CreateScene();
 	auto &gameScene = sceneManager.CreateScene();
+	auto &scoreScene = sceneManager.CreateScene();
 
 	// The flow coordinator outlives any single scene; the active scene pumps its Tick().
 	static std::unique_ptr<dae::GameController> s_controller;
-	s_controller = std::make_unique<dae::GameController>(sceneManager, resourceManager, inputManager, menuScene, gameScene);
+	s_controller = std::make_unique<dae::GameController>(sceneManager, resourceManager, inputManager, menuScene, gameScene, scoreScene);
 	auto *gc = s_controller.get();
 
 	// --- Start menu UI ---
@@ -93,7 +97,9 @@ static void load(dae::SceneManager &sceneManager, dae::ResourceManager &resource
 												   { gc->Tick(); });
 	menuScene.Add(std::move(menuPump));
 
+#ifdef DAE_DEBUG_UI
 	dae::GameDebugUI::RegisterCustomTabs(dae::ImGuiManager::GetInstance());
+#endif
 }
 
 int main(int, char *[])

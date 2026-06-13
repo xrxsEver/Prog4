@@ -24,6 +24,10 @@ namespace dae
         void pause_music() override;
         void resume_music() override;
 
+        bool is_music_playing() const override;
+        void set_muted(bool muted) override;
+        bool is_muted() const override;
+
         std::vector<std::string> get_audio_devices() const override;
         void set_audio_device(int index) override;
         int get_current_device_index() const override;

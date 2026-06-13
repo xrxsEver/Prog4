@@ -1,25 +1,18 @@
 #include "Gamepad.h"
 
-#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <Xinput.h>
-#else
 #include <SDL3/SDL_gamepad.h>
 #include <SDL3/SDL_stdinc.h>
-#endif
 
+#include <string_view>
 #include <utility>
 #include <memory>
 
+// We drive every platform through SDL's gamepad API rather than XInput. XInput only sees
+// Xbox-class pads, so a DualShock/DualSense (or any non-XInput controller) was invisible on
+// Windows; SDL's layer recognises Xbox, PlayStation, Bluetooth and generic pads out of the box
+// (built-in mapping db) and gives us hot-plug for free, which is what two-player co-op/versus needs.
 namespace
 {
-#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
-    constexpr std::int16_t g_LeftStickDeadzone{XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE};
-    constexpr std::int16_t g_RightStickDeadzone{XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE};
-    constexpr std::uint8_t g_TriggerThreshold{XINPUT_GAMEPAD_TRIGGER_THRESHOLD};
-    constexpr std::string_view g_BackendName{"XInput"};
-#else
     constexpr std::int16_t g_LeftStickDeadzone{7849};
     constexpr std::int16_t g_RightStickDeadzone{8689};
     constexpr std::uint8_t g_TriggerThreshold{30};
@@ -84,12 +77,10 @@ namespace
 
         return static_cast<std::uint8_t>((static_cast<std::uint32_t>(rawValue) * 255u) / 32767u);
     }
-#endif
 }
 
 struct dae::Gamepad::Impl
 {
-#if !defined(_WIN32) || defined(__EMSCRIPTEN__)
     ~Impl()
     {
         if (handle != nullptr)
@@ -98,7 +89,6 @@ struct dae::Gamepad::Impl
             handle = nullptr;
         }
     }
-#endif
 
     std::uint32_t playerIndex{};
     std::uint32_t packetNumber{};
@@ -117,10 +107,8 @@ struct dae::Gamepad::Impl
     std::uint8_t triggerThreshold{g_TriggerThreshold};
     bool connected{};
 
-#if !defined(_WIN32) || defined(__EMSCRIPTEN__)
     SDL_JoystickID instanceId{};
     SDL_Gamepad *handle{};
-#endif
 };
 
 dae::Gamepad::Gamepad(const std::uint32_t playerIndex)
@@ -139,35 +127,8 @@ void dae::Gamepad::Update()
     auto &impl = *m_pImpl;
     impl.previousButtons = impl.currentButtons;
 
-#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
-    XINPUT_STATE state{};
-    const DWORD result = XInputGetState(impl.playerIndex, &state);
-
-    if (result == ERROR_SUCCESS)
-    {
-        impl.connected = true;
-        impl.packetNumber = state.dwPacketNumber;
-        impl.currentButtons = state.Gamepad.wButtons;
-        impl.leftTrigger = state.Gamepad.bLeftTrigger;
-        impl.rightTrigger = state.Gamepad.bRightTrigger;
-        impl.leftThumbX = state.Gamepad.sThumbLX;
-        impl.leftThumbY = state.Gamepad.sThumbLY;
-        impl.rightThumbX = state.Gamepad.sThumbRX;
-        impl.rightThumbY = state.Gamepad.sThumbRY;
-    }
-    else
-    {
-        impl.connected = false;
-        impl.packetNumber = 0;
-        impl.currentButtons = 0;
-        impl.leftTrigger = 0;
-        impl.rightTrigger = 0;
-        impl.leftThumbX = 0;
-        impl.leftThumbY = 0;
-        impl.rightThumbX = 0;
-        impl.rightThumbY = 0;
-    }
-#else
+    // The Nth connected gamepad in SDL's list is "player N"; this keeps a stable mapping and
+    // re-opens the handle whenever that slot changes (a pad was plugged in or pulled out).
     SDL_JoystickID desiredInstanceId{};
     bool foundDesiredGamepad{};
     int gamepadCount{};
@@ -238,7 +199,6 @@ void dae::Gamepad::Update()
         impl.rightThumbX = 0;
         impl.rightThumbY = 0;
     }
-#endif
 
     impl.buttonsDownThisFrame = static_cast<std::uint16_t>((~impl.previousButtons) & impl.currentButtons);
     impl.buttonsUpThisFrame = static_cast<std::uint16_t>(impl.previousButtons & (~impl.currentButtons));

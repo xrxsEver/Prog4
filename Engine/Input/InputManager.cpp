@@ -1,5 +1,7 @@
 #include <SDL3/SDL.h>
+#ifdef DAE_DEBUG_UI
 #include <backends/imgui_impl_sdl3.h>
+#endif
 #include <array>
 #include <cstddef>
 #include <span>
@@ -105,8 +107,10 @@ bool dae::InputManager::ProcessInput()
 			return false;
 		}
 
-		// process event for IMGUI
+#ifdef DAE_DEBUG_UI
+		// process event for IMGUI (only when the debug overlay is compiled in and initialised)
 		ImGui_ImplSDL3_ProcessEvent(&e);
+#endif
 	}
 
 	// keep keyboard state arrays in sync with SDL's scancode array

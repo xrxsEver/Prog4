@@ -24,6 +24,13 @@ add_library(minigin_engine STATIC
 
 target_compile_features(minigin_engine PUBLIC cxx_std_20)
 
+# The ImGui debug overlay is a desktop-debug-only tool: keep it out of Release and out of the
+# web build. DAE_DEBUG_UI is defined only for a Debug, non-Emscripten configuration and, being
+# PUBLIC, propagates to the game target so its overlay hooks compile out the same way.
+if(NOT EMSCRIPTEN)
+  target_compile_definitions(minigin_engine PUBLIC $<$<CONFIG:Debug>:DAE_DEBUG_UI>)
+endif()
+
 target_include_directories(minigin_engine PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/Core
   ${CMAKE_CURRENT_SOURCE_DIR}/Input
@@ -49,10 +56,6 @@ target_link_libraries(minigin_engine PUBLIC
   glm::glm
   imgui
 )
-
-if (WIN32)
-  target_link_libraries(minigin_engine PRIVATE xinput)
-endif()
 
 if(MSVC)
   target_compile_options(minigin_engine PRIVATE /W4 /WX)

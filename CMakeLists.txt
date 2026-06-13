@@ -162,6 +162,7 @@ set(GAME_SOURCES
   Game/Systems/MazeGenerator.cpp
   Game/Systems/IceBlockPool.cpp
   Game/Systems/GameDebugUI.cpp
+  Game/Systems/HighScores.cpp
   Game/Commands/AddScoreCommand.cpp
   Game/Commands/LoseLifeCommand.cpp
   Game/Commands/MoveCommand.cpp
@@ -186,6 +187,7 @@ set(GAME_SOURCES
   Game/Components/LevelDisplayComponent.cpp
   Game/Components/StartMenuComponent.cpp
   Game/Components/VersusControllerComponent.cpp
+  Game/Components/NameEntryComponent.cpp
 )
 
 set(GAME_INCLUDE_DIRS
@@ -214,10 +216,6 @@ target_link_libraries("${TARGET_NAME}" PUBLIC
   minigin_engine
   nlohmann_json::nlohmann_json
 )
-
-if(WIN32 AND NOT EMSCRIPTEN)
-  target_link_libraries("${TARGET_NAME}" PRIVATE xinput)
-endif()
 
 if(MSVC)
   # compile at warning level 4 + treat warnings as errors

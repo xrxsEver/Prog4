@@ -58,6 +58,23 @@ namespace dae
         _real_ss->resume_music();
     }
 
+    bool LoggingSoundSystem::is_music_playing() const
+    {
+        return _real_ss->is_music_playing();
+    }
+
+    void LoggingSoundSystem::set_muted(bool muted)
+    {
+        AudioLogger::Log(muted ? "Muting audio" : "Unmuting audio");
+        std::cout << (muted ? "Muting audio" : "Unmuting audio") << std::endl;
+        _real_ss->set_muted(muted);
+    }
+
+    bool LoggingSoundSystem::is_muted() const
+    {
+        return _real_ss->is_muted();
+    }
+
     std::vector<std::string> LoggingSoundSystem::get_audio_devices() const
     {
         return _real_ss->get_audio_devices();

@@ -118,6 +118,28 @@ namespace dae
             return _currentDeviceIndex;
         }
 
+        // Queried every frame by the level music hand-off; SDL_mixer's MIX_* queries are documented
+        // safe to call from any thread, so this reads the music track directly off the main thread.
+        bool IsMusicPlaying() const
+        {
+            return _musicTrack && MIX_TrackPlaying(_musicTrack);
+        }
+
+        void SetMuted(bool muted)
+        {
+            _muted = muted;
+            if (_mixer)
+            {
+                // Master gain of 0 silences the whole mix; 1 leaves it untouched.
+                MIX_SetMixerGain(_mixer, muted ? 0.0f : 1.0f);
+            }
+        }
+
+        bool IsMuted() const
+        {
+            return _muted;
+        }
+
     private:
         void RefreshDevices()
         {
@@ -161,7 +183,10 @@ namespace dae
             }
             // Dedicated music track
             _musicTrack = MIX_CreateTrack(_mixer);
-            
+
+            // A fresh mixer defaults to full gain, so re-apply mute after a device switch.
+            MIX_SetMixerGain(_mixer, _muted ? 0.0f : 1.0f);
+
             AudioLogger::Log("Audio mixer initialized successfully.");
         }
 
@@ -458,6 +483,7 @@ namespace dae
         float _currentMusicVolume{ 0.0f };
         bool _currentMusicLoop{ false };
         bool _isMusicPaused{ false };
+        std::atomic<bool> _muted{ false };
     };
 
     SDLSoundSystem::SDLSoundSystem(const std::string& dataPath)
@@ -495,6 +521,21 @@ namespace dae
     void SDLSoundSystem::resume_music()
     {
         _pImpl->AddCommand({AudioCommandType::ResumeMusic, 0, 0, "", false, 0});
+    }
+
+    bool SDLSoundSystem::is_music_playing() const
+    {
+        return _pImpl->IsMusicPlaying();
+    }
+
+    void SDLSoundSystem::set_muted(bool muted)
+    {
+        _pImpl->SetMuted(muted);
+    }
+
+    bool SDLSoundSystem::is_muted() const
+    {
+        return _pImpl->IsMuted();
     }
 
     std::vector<std::string> SDLSoundSystem::get_audio_devices() const

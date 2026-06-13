@@ -15,7 +15,9 @@
 #include "Renderer.h"
 #include "ResourceManager.h"
 #include "GameTime.h"
+#ifdef DAE_DEBUG_UI
 #include "ImGuiManager.h"
+#endif
 
 #ifdef __EMSCRIPTEN__
 #include "emscripten.h"
@@ -147,12 +149,15 @@ void dae::Minigin::RunFrame(const float deltaTime)
 	m_sceneManager.Update(deltaTime);
 
 	auto &renderer = Renderer::GetInstance();
-	auto &imgui = ImGuiManager::GetInstance();
 
-	imgui.BeginFrame();
+#ifdef DAE_DEBUG_UI
+	ImGuiManager::GetInstance().BeginFrame();
+#endif
 	renderer.RenderClear();
 	m_sceneManager.Render();
-	imgui.EndFrame();
+#ifdef DAE_DEBUG_UI
+	ImGuiManager::GetInstance().EndFrame();
+#endif
 	renderer.RenderPresent();
 }
 
@@ -163,12 +168,16 @@ dae::Minigin::Minigin(const std::filesystem::path &dataPath)
 
 	Renderer::GetInstance().Init(m_pSdlRuntime->GetWindow());
 	m_resourceManager.Init(dataPath);
+#ifdef DAE_DEBUG_UI
 	ImGuiManager::GetInstance().Init(m_sceneManager, m_inputManager);
+#endif
 }
 
 dae::Minigin::~Minigin()
 {
+#ifdef DAE_DEBUG_UI
 	ImGuiManager::GetInstance().ShutDown();
+#endif
 	m_sceneManager.RemoveAllScenes();
 	m_resourceManager.ShutDown();
 	Renderer::GetInstance().Destroy();

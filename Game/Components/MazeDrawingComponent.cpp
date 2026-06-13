@@ -16,6 +16,20 @@
 
 namespace
 {
+    // Level music: the draw track loops while carving, Start.mp3 is the one-shot intro jingle, and
+    // MainBGM.mp3 loops for the rest of the level.
+    constexpr const char* kDrawMusic = "Sounds/DrawingMaze.mp3";
+    constexpr const char* kStartMusic = "Sounds/Start.mp3";
+    constexpr const char* kMainBgm = "Sounds/MainBGM.mp3";
+    constexpr float kDrawVolume = 0.5f;
+    constexpr float kStartVolume = 0.5f;
+    constexpr float kBgmVolume = 0.4f;
+    // Let the audio thread flush the stop(draw)+play(start) swap before we start polling, so we never
+    // mistake the draw track's tail (or the brief gap) for Start.mp3 and skip the jingle.
+    constexpr float kStartSettleSeconds = 0.25f;
+    // If audio is disabled/failed, Start.mp3 never reports "playing"; start the loop anyway after this.
+    constexpr float kStartGraceSeconds = 1.5f;
+
     // The Sno-Bee sprite block (row, col) into pengo.png, keyed by level number and shared across
     // all game modes. Kept in code (not JSON) so there's a single obvious place to retune it.
     // pengo.png is 40x18 cells of 16px, so these stay on-sheet. Tweak the values here per level.
@@ -104,10 +118,16 @@ namespace dae
             const int index = pos.first * m_cols + pos.second;
             m_removalOrder.push_back(index);
         }
+
+        // Start the looping maze-draw track; it's swapped for Start.mp3 once the carve finishes.
+        ServiceLocator::get_sound_system().play_music(kDrawMusic, kDrawVolume, true);
     }
 
     void MazeDrawingComponent::Update(float deltaTime)
     {
+        // Music hand-off runs in every phase (the jingle ends partway into normal play).
+        UpdateMusic(deltaTime);
+
         // Once the intro is over the maze runs as a little state machine
         switch (m_phase)
         {
@@ -147,10 +167,13 @@ namespace dae
             else
             {
                 m_isFinished = true;
-                // Finished! Stop drawing sound and play start sound
+                // Finished! Swap the draw track for the one-shot start jingle, then arm the hand-off
+                // that brings up the looping level theme as soon as the jingle ends (see UpdateMusic).
                 ServiceLocator::get_sound_system().stop_music();
-                ServiceLocator::get_sound_system().play_music("Sounds/Start.mp3", 0.5f, false);
-                
+                ServiceLocator::get_sound_system().play_music(kStartMusic, kStartVolume, false);
+                m_bgmPhase = BgmPhase::WaitStartBegin;
+                m_bgmGraceTimer = 0.0f;
+
                 // Pick 3 random remaining ice blocks
                 std::vector<int> iceBlockIndices;
                 for (int i = 0; i < static_cast<int>(m_blocks.size()); ++i)
@@ -281,6 +304,45 @@ namespace dae
         }
     }
 
+    void MazeDrawingComponent::UpdateMusic(float deltaTime)
+    {
+        auto& sound = ServiceLocator::get_sound_system();
+        switch (m_bgmPhase)
+        {
+        case BgmPhase::WaitStartBegin:
+            // Let the swap settle, then wait until Start.mp3 is actually sounding before watching for
+            // its end. If it never starts — audio is off or the file failed — fall through to the loop
+            // after a grace period instead of hanging.
+            m_bgmGraceTimer += deltaTime;
+            if (m_bgmGraceTimer < kStartSettleSeconds)
+            {
+                break; // too soon to trust the music-playing query
+            }
+            if (sound.is_music_playing())
+            {
+                m_bgmPhase = BgmPhase::WaitStartEnd;
+            }
+            else if (m_bgmGraceTimer >= kStartGraceSeconds)
+            {
+                sound.play_music(kMainBgm, kBgmVolume, true);
+                m_bgmPhase = BgmPhase::Looping;
+            }
+            break;
+
+        case BgmPhase::WaitStartEnd:
+            // The jingle has finished the moment the music track falls silent: bring up the loop.
+            if (!sound.is_music_playing())
+            {
+                sound.play_music(kMainBgm, kBgmVolume, true);
+                m_bgmPhase = BgmPhase::Looping;
+            }
+            break;
+
+        default:
+            break; // Drawing / Looping: nothing to poll
+        }
+    }
+
     void MazeDrawingComponent::StartDeathSequence()
     {
         m_phase = LevelPhase::DeathWipe;
@@ -327,6 +389,21 @@ namespace dae
 
     void MazeDrawingComponent::BeginRespawn()
     {
+        // Out of lives? A player survives this death only if it still has more than the one life it
+        // is about to spend (Respawn() calls LoseLife). When nobody survives, the run is over: fire
+        // the one-shot callback and freeze here instead of putting Pengo back on the field.
+        const bool p1Survives = m_pPengo && m_pPengo->health > 1;
+        const bool p2Survives = m_pPengo2 && m_hasSecondSpawn && m_pPengo2->health > 1;
+        if (!p1Survives && !p2Survives)
+        {
+            if (!m_gameOverFired)
+            {
+                m_gameOverFired = true;
+                if (m_onGameOver) m_onGameOver();
+            }
+            return;
+        }
+
         // Put the remembered ice blocks back where they were
         m_pIceBlockPool->Restore(m_blockSnapshot);
 
@@ -362,6 +439,11 @@ namespace dae
 
         // Hatch the same number of Sno-Bees that were alive before
         SpawnSnoBees(m_rememberedSnoBeeCount);
+
+        // The death wipe stopped the music; bring the level theme back for the rest of the round
+        // (no Start.mp3 replay — that jingle only opens a fresh level).
+        ServiceLocator::get_sound_system().play_music(kMainBgm, kBgmVolume, true);
+        m_bgmPhase = BgmPhase::Looping;
 
         m_phase = LevelPhase::Playing;
     }
